@@ -240,7 +240,7 @@ function startWebSocket() {
                                 setTimer(newTime);
                                 setTimeout(() => {
                                     reserParams();
-                                    botStart();
+                                    startWebSocket();
                                 }, newTime);
                             } else {
                                 runPrediction();
