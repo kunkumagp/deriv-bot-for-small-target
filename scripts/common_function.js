@@ -107,20 +107,13 @@ function setAccountDetailsAndAcount(account) {
 
 
     if(localStorage.getItem('date')){
-        // console.log('date exist');
-        console.log(now.toLocaleDateString());
-
-        console.log(localStorage.getItem('date'));
-
         if(localStorage.getItem('date') != now.toLocaleDateString()){
-            // console.log('new date');
             localStorage.setItem('date', now.toLocaleDateString());
             let datTargetAmount = (initialAccountBalance * (dayTargetPercentage / 100));
             localStorage.setItem('datTargetAmount', datTargetAmount);
             localStorage.setItem('datTargetCapital', (initialAccountBalance + datTargetAmount));
         }
     } else {
-        // console.log('date not exist');
         localStorage.setItem('date', now.toLocaleDateString());
         let datTargetAmount = (initialAccountBalance * (dayTargetPercentage / 100));
         localStorage.setItem('datTargetAmount', datTargetAmount);
@@ -415,7 +408,7 @@ async function runPredictionAndTrade() {
     try {
         const prediction = await predictor.predictNext();
         console.log("Prediction Result:", prediction);
-        runScript(prediction)
+        runScript(prediction);
         return prediction;
     } catch (error) {
         console.error("Prediction error:", error);
