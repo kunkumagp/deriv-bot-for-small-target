@@ -119,7 +119,7 @@ function startWebSocket() {
                         // Run prediction and trade
                         console.log("Run prediction and trade");
                         setFlashNotification("Run prediction and trade", 0);
-                        // runPrediction()
+                        runPrediction()
                     }
 
                 } else if (wsResponse?.error?.code !== undefined && wsResponse.error.code === "WrongResponse") {
