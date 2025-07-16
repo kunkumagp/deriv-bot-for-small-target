@@ -1,0 +1,181 @@
+body {
+    background-color: rgb(29, 29, 29);
+    color: #fff;
+  }
+  
+  .params {
+    max-width: 400px;
+    /* margin: auto; */
+    display: grid;
+    row-gap: 10px;
+  }
+  
+  pre,
+  .btn.btn-default {
+    background-color: rgb(52, 52, 52);
+    border: none;
+    color: #fff;
+  }
+  
+  .btn.btn-default:hover,
+  .btn.btn-default:active,
+  .btn.btn-default.active,
+  .btn.btn-default.active:hover,
+  .btn.btn-default:focus {
+    background-color: rgb(41, 36, 36);
+    border: none !important;
+    color: #fff;
+  }
+  
+  .btn.btn-default.active:hover {
+    background-color: rgb(16, 14, 14);
+    border: none !important;
+    color: #fff;
+  }
+  
+  .btn-back {
+    position: fixed;
+    top: 25px;
+    left: 25px;
+    border-radius: 26px;
+    padding: 5px 15px;
+  }
+  
+  .btn[disabled],
+  .btn[disabled]:hover
+  {
+    background-color: rgb(33 33 33);
+    border: none !important;
+    color: #808080;
+  }
+  
+  .hide {
+    display: none;
+    transition: all 1s ease-out;
+  }
+  
+  .show {
+    display: block;
+    transition: all 1s ease-out;
+  }
+  
+  .col-md-6 {
+    margin-bottom: 20px;
+  }
+  
+  /* Form */
+  .form-field {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  .form-element {
+    max-width: 275px;
+    width: 275px;
+  }
+  
+  .form-control {
+    background-color: rgb(52, 52, 52);
+    border: none;
+    color: #fff;
+    width: 100%;
+  }
+  
+  .countdownlabel,
+  .tickCountLabel {
+    position: absolute;
+    right: 10%;
+    bottom: 25%;
+  }
+  
+  .countdownlabel .text,
+  .tickCountLabel .text {
+    color: #676767;
+  }
+  .countdownlabel .number,
+  .tickCountLabel .number {
+    font-size: 48px;
+    color: #9a9a9a;
+  }
+  
+  .percentage {
+    font-weight: 900;
+    color: green;
+  }
+  
+  @media screen and (max-width: 991px) {
+    .params {
+      max-width: unset;
+      display: grid;
+      row-gap: 10px;
+    }
+  }
+  
+  .account-info,
+  .result-notification {
+    background-color: rgb(52, 52, 52);
+    border: none;
+    color: #fff;
+    padding: 9.5px;
+  }
+  
+  .account-info .field {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+  }
+  
+  .line-break {
+    border-bottom: 1px #595959;
+    border-bottom-style: dashed;
+    margin: 10px 0;
+  }
+  
+  .flash-notification {
+    height: 30px;
+    padding: 40px 0;
+    color: #676767;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .flash-notification .number {
+    font-size: 24px;
+    color: #9a9a9a;
+    margin: 0 10px;
+  }
+  
+  .result-notification .stake-info {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px;
+    border: 1px solid #373737;
+    overflow: auto;
+  }
+  
+  .result-notification .stake-info:hover {
+    background-color: #373737;
+    cursor: pointer;
+  }
+  
+  .result-notification .stake-info .detailt {
+    color: #8e8e8e;
+  }
+  
+  .result-notification .stake-info .detailt .contract-info {
+    color: #cdcdcd;
+  }
+  
+  .green {
+    color: #00d300;
+    font-weight: 700;
+  }
+  
+  .red {
+    color: #d30000;
+    font-weight: 700;
+  }
+  
