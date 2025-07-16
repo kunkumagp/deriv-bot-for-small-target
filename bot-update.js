@@ -1,5 +1,5 @@
 let ws, apiToken, intervalId;
-let isRunning = false;
+let isRunning2 = false;
 
 const accountSelectElement = document.getElementById("account_select");
 const marketSelectElement = document.getElementById("market");
@@ -36,11 +36,11 @@ market = getRandomMarket(marketArray, '');
 // botStart();
 
 
-startBotButton.addEventListener('click', runScript);
+startBotButton.addEventListener('click', botStart);
 resetBotButton.addEventListener('click', resetBot);
 
-function runScript() {
-    if (isRunning) {
+function botStart() {
+    if (isRunning2) {
         // Stop the loop and close the WebSocket
         webSocketConnectionStop();
     } else {
@@ -51,7 +51,7 @@ function runScript() {
 
 
 function webSocketConnectionStart(){
-    isRunning = true;
+    isRunning2 = true;
     console.log('WebSocket connection started.');
     setFlashNotification("WebSocket connection started", 0);
     startBotButton.innerHTML = "Script running....Stop WebSocket";
@@ -60,7 +60,7 @@ function webSocketConnectionStart(){
 };
 
 function webSocketConnectionStop(){
-    isRunning = false;
+    isRunning2 = false;
     clearInterval(intervalId); // Stop the interval loop
     weClose();
     console.log('WebSocket connection stopped.');
@@ -119,7 +119,7 @@ function startWebSocket() {
                         // Run prediction and trade
                         console.log("Run prediction and trade");
                         setFlashNotification("Run prediction and trade", 0);
-                        runPrediction()
+                        runPrediction();
                     }
 
                 } else if (wsResponse?.error?.code !== undefined && wsResponse.error.code === "WrongResponse") {
