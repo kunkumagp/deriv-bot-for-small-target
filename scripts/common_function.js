@@ -187,8 +187,9 @@ function runScript(prediction) {
     placeTrade(prediction.prediction, prediction.duration);
 }
 
+// Improved EvenOddPredictor class with dynamic strategy weighting, confidence refinement,
+// agreement boost, and post-trade performance tracking
 
-// Initialize predictor
 class EvenOddPredictor {
     constructor() {
         this.history = [];
@@ -196,6 +197,13 @@ class EvenOddPredictor {
         this.minHistoryForPrediction = 20;
         this.maxDuration = 8;
         this.minDuration = 5;
+
+        this.strategyStats = {
+            "Basic Last Digit Analysis": { wins: 0, total: 0 },
+            "Weighted Moving Average": { wins: 0, total: 0 },
+            "Pattern Recognition": { wins: 0, total: 0 },
+            "Machine Learning Simulation": { wins: 0, total: 0 }
+        };
     }
 
     addTradeResult(tradeResult) {
@@ -203,6 +211,25 @@ class EvenOddPredictor {
         if (this.history.length > 500) {
             this.history.shift();
         }
+
+        // Update strategy stats
+        if (tradeResult.predictedBy) {
+            tradeResult.predictedBy.forEach(pred => {
+                this.updateStrategyStats(pred.strategy, pred.prediction === tradeResult.outcome);
+            });
+        }
+    }
+
+    updateStrategyStats(strategyName, wasCorrect) {
+        if (!this.strategyStats[strategyName]) return;
+        this.strategyStats[strategyName].total += 1;
+        if (wasCorrect) this.strategyStats[strategyName].wins += 1;
+    }
+
+    getDynamicWeight(strategyName) {
+        const stats = this.strategyStats[strategyName];
+        if (!stats || stats.total === 0) return 0.25; // fallback
+        return Math.max(stats.wins / stats.total, 0.1); // Avoid zero weight
     }
 
     async predictNext() {
@@ -221,28 +248,28 @@ class EvenOddPredictor {
         const patternPrediction = this.patternRecognition();
         const mlPrediction = await this.machineLearningPrediction();
 
-        const predictions = [
-            { ...basicPrediction, weight: 0.25 },
-            { ...wmaPrediction, weight: 0.25 },
-            { ...patternPrediction, weight: 0.3 },
-            { ...mlPrediction, weight: 0.2 }
-        ];
+        const predictions = [basicPrediction, wmaPrediction, patternPrediction, mlPrediction];
 
         let evenScore = 0;
         let oddScore = 0;
         let totalWeight = 0;
 
         predictions.forEach(pred => {
+            const weight = this.getDynamicWeight(pred.strategy);
             if (pred.prediction === "even") {
-                evenScore += pred.confidence * pred.weight;
+                evenScore += pred.confidence * weight;
             } else {
-                oddScore += pred.confidence * pred.weight;
+                oddScore += pred.confidence * weight;
             }
-            totalWeight += pred.weight;
+            totalWeight += weight;
         });
 
         const finalPrediction = evenScore > oddScore ? "even" : "odd";
-        const confidence = (finalPrediction === "even" ? evenScore : oddScore) / totalWeight;
+        let confidence = (finalPrediction === "even" ? evenScore : oddScore) / totalWeight;
+
+        const agreementCount = predictions.filter(p => p.prediction === finalPrediction).length;
+        if (agreementCount >= 3) confidence = Math.min(confidence + 0.1, 0.95);
+
         const duration = this.calculateOptimalDuration(finalPrediction);
 
         return {
@@ -257,30 +284,16 @@ class EvenOddPredictor {
     basicLastDigitAnalysis() {
         const lastDigits = this.history.map(t => t.digit);
         const digitCounts = Array(10).fill(0);
+        lastDigits.forEach(digit => digitCounts[digit]++);
 
-        lastDigits.forEach(digit => {
-            digitCounts[digit]++;
-        });
-
-        let mostFrequentDigit = 0;
-        let leastFrequentDigit = 0;
-
-        for (let i = 0; i < 10; i++) {
-            if (digitCounts[i] > digitCounts[mostFrequentDigit]) {
-                mostFrequentDigit = i;
-            }
-            if (digitCounts[i] < digitCounts[leastFrequentDigit]) {
-                leastFrequentDigit = i;
-            }
-        }
-
-        const prediction = mostFrequentDigit % 2 === 0 ? "odd" : "even";
-        const confidence = 0.5 + (digitCounts[mostFrequentDigit] / this.history.length) * 0.3;
+        let mostFrequentDigit = digitCounts.indexOf(Math.max(...digitCounts));
+        const prediction = mostFrequentDigit % 2 === 0 ? "even" : "odd";
+        const confidence = Math.min(0.5 + (digitCounts[mostFrequentDigit] / this.history.length) * 0.3, 0.85);
 
         return {
             strategy: "Basic Last Digit Analysis",
-            prediction: prediction,
-            confidence: Math.min(confidence, 0.85),
+            prediction,
+            confidence,
             digitStats: digitCounts
         };
     }
@@ -296,21 +309,18 @@ class EvenOddPredictor {
         let totalWeight = 0;
 
         weightedHistory.forEach(item => {
-            if (item.outcome === "even") {
-                evenScore += item.weight;
-            } else {
-                oddScore += item.weight;
-            }
+            if (item.outcome === "even") evenScore += item.weight;
+            else oddScore += item.weight;
             totalWeight += item.weight;
         });
 
         const prediction = evenScore > oddScore ? "even" : "odd";
-        const confidence = (prediction === "even" ? evenScore : oddScore) / totalWeight;
+        const confidence = Math.max(0.5, (prediction === "even" ? evenScore : oddScore) / totalWeight);
 
         return {
             strategy: "Weighted Moving Average",
-            prediction: prediction,
-            confidence: confidence,
+            prediction,
+            confidence,
             recentBias: (evenScore - oddScore) / totalWeight
         };
     }
@@ -329,21 +339,21 @@ class EvenOddPredictor {
                     break;
                 }
             }
-
             if (match) {
                 patternCount++;
-                const nextOutcome = this.history[i + this.patternLength].outcome;
-                if (nextOutcome === "even") patternMatchEven++;
+                const next = this.history[i + this.patternLength].outcome;
+                if (next === "even") patternMatchEven++;
                 else patternMatchOdd++;
             }
         }
 
         if (patternCount > 0) {
-            const confidence = Math.max(patternMatchEven, patternMatchOdd) / patternCount;
+            let confidence = Math.max(patternMatchEven, patternMatchOdd) / patternCount;
+            if (patternCount > 10) confidence += 0.1;
             return {
                 strategy: "Pattern Recognition",
                 prediction: patternMatchEven > patternMatchOdd ? "even" : "odd",
-                confidence: confidence,
+                confidence: Math.min(confidence, 0.95),
                 patternMatches: patternCount
             };
         }
@@ -368,31 +378,18 @@ class EvenOddPredictor {
 
         return {
             strategy: "Machine Learning Simulation",
-            prediction: prediction,
-            confidence: confidence,
+            prediction,
+            confidence,
             analysis: "State-based prediction"
         };
     }
 
     calculateOptimalDuration(prediction) {
-        const successfulTrades = this.history.filter(t =>
-            t.outcome === prediction && t.profit > 0
-        );
-
-        if (successfulTrades.length === 0) {
-            return this.getRandomDuration();
-        }
+        const successfulTrades = this.history.filter(t => t.outcome === prediction && t.profit > 0);
+        if (successfulTrades.length === 0) return this.getRandomDuration();
 
         const avgDuration = successfulTrades.reduce((sum, t) => sum + t.duration, 0) / successfulTrades.length;
-        const optimalDuration = Math.min(
-            this.maxDuration,
-            Math.max(
-                this.minDuration,
-                Math.round(avgDuration)
-            )
-        );
-
-        return optimalDuration;
+        return Math.min(this.maxDuration, Math.max(this.minDuration, Math.round(avgDuration)));
     }
 
     getRandomDuration() {
@@ -400,8 +397,8 @@ class EvenOddPredictor {
     }
 }
 
-
 const predictor = new EvenOddPredictor();
+
 
 
 async function runPredictionAndTrade() {
