@@ -20,12 +20,14 @@ let initialAccountBalance = 0,
     currentProfitAmount = 0,
     currentLossAmount = 0,
     tradeType = "even",
-    stopTimer = false
+    stopTimer = false,
+    tickHistory = [],
+    ldp = 2
     ;
 
 const now = new Date();
 
-const martingaleMultiplier1 = 2.07112,
+let martingaleMultiplier1 = 2.07112,
     martingaleMultiplier2 = 1.3;
 
 const accounts = [
@@ -81,7 +83,11 @@ const fetchTradeDetails = (ws, contractId) => {
 };
 
 
-const stakeChange = (status) => {
+const stakeChange = (status,customMartingaleMultiplier = null) => {
+    if(customMartingaleMultiplier != null){
+        martingaleMultiplier1 = customMartingaleMultiplier;
+    }
+
     if (status == "Loss") {
         stake = stake * martingaleMultiplier1;
     } else if (status == "Win") {
@@ -92,9 +98,33 @@ const stakeChange = (status) => {
 
 };
 
+const requestTicksHistory = (ws, symbol) => {
+    const ticksHistoryRequest = {
+        ticks_history: symbol,
+        end: 'latest',
+        count: 2, // Increased count for a larger dataset (more ticks for better prediction)
+        style: 'ticks'
+    };
+    ws.send(JSON.stringify(ticksHistoryRequest));
+};
+
+const startTicks = (ws, market) => {
+    // signalMessage('Start ticking...');
+
+    ws.send(JSON.stringify({
+        ticks: market,
+        subscribe: 1,
+    }));
+};
+
+const stopTicks = (ws) => {
+    ws.send(JSON.stringify({
+        forget: subscriptionId, // Use the stored subscription ID
+    }));
+};
 
 
-function setAccountDetailsAndAcount(account) {
+function setAccountDetailsAndAcount(account, customAmountPercentage = null ) {
     initialAccountBalance = Number(account.balance);
     newAccountBalance = initialAccountBalance;
     setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
@@ -102,9 +132,12 @@ function setAccountDetailsAndAcount(account) {
     targetAmount = (initialAccountBalance * (targetPercentage / 100)).toFixed(2);
     setAccountInfo("targetAmount", `$ ${targetAmount}`);
 
+    if(customAmountPercentage != null){
+        amountPercentage = customAmountPercentage;
+    }
+
     amountPutForTrading = (initialAccountBalance * (amountPercentage / 100)).toFixed(2);
     setAccountInfo("amountPutForTrading", `$ ${amountPutForTrading}`);
-
 
     if(localStorage.getItem('date')){
         if(localStorage.getItem('date') != now.toLocaleDateString()){
@@ -515,13 +548,13 @@ function runPrediction() {
 
 
 function setInfo(contract, lastTradeProfit) {
-    updatedAccountBalance = initialAccountBalance + lastTradeProfit;
 
 
     currentProfitAmount = currentProfitAmount + lastTradeProfit;
     currentLossAmount = currentLossAmount + lastTradeProfit;
     if(currentLossAmount >= 0){currentLossAmount = 0;}
 
+    updatedAccountBalance = initialAccountBalance + currentProfitAmount;
     netProfit = updatedAccountBalance - initialAccountBalance;
 
     if (lastTradeProfit > 0) {
@@ -704,3 +737,73 @@ function resetBot() {
     localStorage.clear();
     reload();
 }
+
+function storeTickData(currentTick, tickCount) {
+    // Push new tick value to history
+    tickHistory.push(currentTick);
+
+    // Keep only the last 2 ticks
+    if (tickHistory.length > tickCount) {
+      tickHistory.shift(); // remove oldest
+    }
+
+    // Optional: log or send to callback
+    console.log("Tick history (last "+tickCount+"):", tickHistory);
+}
+
+
+
+function areLastDigitsUnderOrEqualTwo(tickArray, tickArrayCount) {
+    if (!Array.isArray(tickArray) || tickArray.length !== tickArrayCount) {
+      console.error("Input must be an array with exactly two numbers.");
+      return false;
+    }
+  
+    const getDecimalPlaces = (num) => {
+      const parts = num.toString().split('.');
+      return parts[1] ? parts[1].length : 0;
+    };
+  
+    const lastDigits = tickArray.map(value => {
+      const decimalPlaces = getDecimalPlaces(value);
+      const fixed = decimalPlaces === 2 
+        ? value.toFixed(2) + '0'      // force third decimal digit to 0
+        : value.toFixed(3);           // leave as is for 3 decimals
+  
+      return parseInt(fixed[fixed.length - 1], 10); // last digit
+    });
+  
+    console.log("Last digits:", lastDigits); 
+    return lastDigits.every(d => d <= ldp);
+  }
+
+
+//   function areLastDigitsUnderOrEqualTwo(tickArray, tickArrayCount) {
+//     if (!Array.isArray(tickArray) || tickArray.length !== tickArrayCount) {
+//       console.error("Input must be an array with exactly two numbers.");
+//       return false;
+//     }
+  
+//     const getLastDigit = (num) => {
+//       // Remove decimal point and get last digit
+//       const numStr = num.toString().replace('.', '');
+//       const lastChar = numStr[numStr.length - 1];
+//       return parseInt(lastChar, 10);
+//     };
+  
+//     const lastDigits = tickArray.map(getLastDigit);
+  
+//     console.log("Last digits:", lastDigits); // Optional for debugging
+  
+//     return lastDigits.every(d => d <= 2);
+//   }
+  
+  
+  
+
+  function checkBalance(ws) {
+    ws.send(JSON.stringify({
+      balance: 1
+    }));
+  }
+
