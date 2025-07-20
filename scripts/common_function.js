@@ -22,7 +22,8 @@ let initialAccountBalance = 0,
     tradeType = "even",
     stopTimer = false,
     tickHistory = [],
-    ldp = 2
+    ldp = 2,
+    isRunning = false
     ;
 
 const now = new Date();
@@ -766,9 +767,13 @@ function areLastDigitsUnderOrEqualTwo(tickArray, tickArrayCount) {
   
     const lastDigits = tickArray.map(value => {
       const decimalPlaces = getDecimalPlaces(value);
-      const fixed = decimalPlaces === 2 
-        ? value.toFixed(2) + '0'      // force third decimal digit to 0
-        : value.toFixed(3);           // leave as is for 3 decimals
+    //   const fixed = decimalPlaces === 2 
+    //     ? value.toFixed(2) + '0'      // force third decimal digit to 0
+    //     : value.toFixed(3);           // leave as is for 3 decimals
+
+    const fixed = decimalPlaces === 1 
+        ? value.toFixed(1) + '0'      // force third decimal digit to 0
+        : value.toFixed(2);           // leave as is for 3 decimals
   
       return parseInt(fixed[fixed.length - 1], 10); // last digit
     });

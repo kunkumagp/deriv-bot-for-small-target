@@ -39,7 +39,8 @@ accountSelectElement.addEventListener("change", () => {
     apiToken = accountSelectElement.value;
 });
 
-market = getRandomMarket(marketArray2, '');
+// market = getRandomMarket(marketArray2, '');
+market = 'R_100';
 
 // botStart();
 
@@ -160,7 +161,8 @@ function startWebSocket() {
                 if(currentLossAmount < 0){
                     tickArrayCount = 2;
                 } else {
-                    tickArrayCount = 1;
+                    // tickArrayCount = 1;
+                    tickArrayCount = 0;
                 }
 
                 console.log('tickArrayCount - ', tickArrayCount);
@@ -231,23 +233,33 @@ function startWebSocket() {
                         
 
                         if (currentLossAmount < 0) {
-                            // if(lostCountInRow == 2){
-                            //     stake = amountPutForTrading * 10;
-                            // } else if(lostCountInRow == 1){
-                            //     stake = stake * 3;
-                            // }
+                            if(lostCountInRow == 2){
+                                stake = amountPutForTrading * 10;
+                            } else if(lostCountInRow == 1){
+                                stake = stake * 3;
+                            }
                             console.log('new stake - ', stake);
                             placeOverUnderTrade(stake); 
 
-                            startTicks(ws, market);
+                            let newTime = (getRandomNumber(1, 10) * 1000 );
+                            setTimer(newTime);
+                            setTimeout(() => {
+                                startTicks(ws, market);
+                            }, newTime);
                         } else {
+                          
                             // stake = amountPutForTrading;
                             stake = (updatedAccountBalance * (2 / 100)).toFixed(2);
 
                             placeOverUnderTrade(stake); 
                             tickHistory = [];
                             // checkBalance();
-                            startTicks(ws, market);
+                            let newTime = (getRandomNumber(1, 10) * 1000 );
+                            setTimer(newTime);
+                            setTimeout(() => {
+                                startTicks(ws, market);
+                            }, newTime);
+                            
                         }
                     } else {
                         setTimeout(() => {
@@ -286,9 +298,3 @@ function startWebSocket() {
 
 
 }
-
-function newStake() {
-    stake = (updatedAccountBalance * (amountPercentage / 100)).toFixed(2);
-}
-
-
