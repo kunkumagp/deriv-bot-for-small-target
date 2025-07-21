@@ -232,7 +232,7 @@ function startWebSocket() {
                         } else {
                             lostCountInRow = 0;
 
-                            if(winTradeCount >= 10){
+                            if(winTradeCount >= 5 && currentLossAmount == 0){
                                 reload();
                             }
                         }
