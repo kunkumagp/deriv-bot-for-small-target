@@ -102,7 +102,7 @@ const requestTicksHistory = (ws, symbol) => {
     const ticksHistoryRequest = {
         ticks_history: symbol,
         end: 'latest',
-        count: 2, // Increased count for a larger dataset (more ticks for better prediction)
+        count: 10, // Increased count for a larger dataset (more ticks for better prediction)
         style: 'ticks'
     };
     ws.send(JSON.stringify(ticksHistoryRequest));
@@ -753,7 +753,7 @@ function storeTickData(currentTick, tickCount) {
 
 
 
-function areLastDigitsUnderOrEqualTwo(tickArray, tickArrayCount) {
+function areLastDigitsUnderOrEqualTwo(tickArray, tickArrayCount, decimalCount) {
     if (!Array.isArray(tickArray) || tickArray.length !== tickArrayCount) {
       console.error("Input must be an array with exactly two numbers.");
       return false;
@@ -765,14 +765,16 @@ function areLastDigitsUnderOrEqualTwo(tickArray, tickArrayCount) {
     };
   
     const lastDigits = tickArray.map(value => {
-      const decimalPlaces = getDecimalPlaces(value);
-      const fixed = decimalPlaces === 2 
-        ? value.toFixed(2) + '0'      // force third decimal digit to 0
-        : value.toFixed(3);           // leave as is for 3 decimals
-  
-      return parseInt(fixed[fixed.length - 1], 10); // last digit
+        let fixed = value.toFixed(decimalCount);
+    
+        // Ensure we have enough decimal digits (pad with zeros if needed)
+        if (fixed.split('.')[1].length < decimalCount) {
+          fixed += '0'.repeat(decimalCount - fixed.split('.')[1].length);
+        }
+    
+        return parseInt(fixed[fixed.length - 1], 10); // last digit
     });
-  
+      
     console.log("Last digits:", lastDigits); 
     return lastDigits.every(d => d <= ldp);
   }
@@ -807,3 +809,20 @@ function areLastDigitsUnderOrEqualTwo(tickArray, tickArrayCount) {
     }));
   }
 
+
+  function getMaxDecimalPlaces(numbers) {
+    let maxDecimals = 0;
+
+    numbers.forEach(num => {
+        const numStr = num.toString();
+
+        if (numStr.includes('.')) {
+            const decimals = numStr.split('.')[1].length;
+            if (decimals > maxDecimals) {
+                maxDecimals = decimals;
+            }
+        }
+    });
+
+    return maxDecimals;
+}

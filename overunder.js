@@ -1,5 +1,6 @@
 let ws, apiToken, intervalId;
 let isRunning2 = false;
+let decimalCount;
 
 const marketArray2 = [
     { value: "R_10", name: "Volatility 10 Index" },
@@ -41,7 +42,7 @@ accountSelectElement.addEventListener("change", () => {
 
 market = getRandomMarket(marketArray2, '');
 
-// botStart();
+botStart();
 
 
 startBotButton.addEventListener('click', botStart);
@@ -101,7 +102,6 @@ function startWebSocket() {
 
         if (wsResponse != null) {
 
-            console.log(wsResponse);
 
             if (wsResponse.msg_type === "authorize") {
                 console.log("Authorization successful.\n-----------------------------\n\n");
@@ -116,13 +116,21 @@ function startWebSocket() {
                     console.log("Start Analizing");
                     setFlashNotification("Start Analizing", 0);
 
-                    // requestTicksHistory(ws, market);
+                    requestTicksHistory(ws, market);
                     placeOverUnderTrade(stake); 
-                    startTicks(ws, market);
+                    setTimeout(() => {
+                        startTicks(ws, market);
+                    }, 3000);
 
                 } else if (wsResponse?.error?.code !== undefined && wsResponse.error.code === "WrongResponse") {
                     reload();
                 }
+            }
+
+            if (wsResponse.msg_type === "history") {
+                decimalCount = getMaxDecimalPlaces(wsResponse.history.prices);
+                console.log('Decimal Count - ', decimalCount);
+
             }
 
             if (wsResponse.msg_type === "proposal") {
@@ -163,12 +171,9 @@ function startWebSocket() {
                     tickArrayCount = 1;
                 }
 
-                console.log('tickArrayCount - ', tickArrayCount);
-
                 storeTickData(currentTick, tickArrayCount);
-                
 
-                let tradeStatus = areLastDigitsUnderOrEqualTwo(tickHistory, tickArrayCount);
+                let tradeStatus = areLastDigitsUnderOrEqualTwo(tickHistory, tickArrayCount, decimalCount);
                 console.log('tradeStatus - ',tradeStatus);
 
                 if(tradeStatus){
@@ -226,20 +231,32 @@ function startWebSocket() {
                             lostCountInRow = lostCountInRow + 1;
                         } else {
                             lostCountInRow = 0;
+
+                            if(winTradeCount >= 10){
+                                reload();
+                            }
                         }
 
                         
 
                         if (currentLossAmount < 0) {
-                            // if(lostCountInRow == 2){
-                            //     stake = amountPutForTrading * 10;
-                            // } else if(lostCountInRow == 1){
-                            //     stake = stake * 3;
-                            // }
-                            console.log('new stake - ', stake);
+
+                            let timer = 0;
+                            if(lostCountInRow >= 2){
+                                timer = (getRandomNumber(1, 10) * 1000 );
+                                stake = amountPutForTrading * 11;
+
+                            } else if(lostCountInRow == 1){
+                                timer = (getRandomNumber(1, 5) * 1000 );
+                                stake = amountPutForTrading * 3;
+
+                            }
                             placeOverUnderTrade(stake); 
 
-                            startTicks(ws, market);
+                            setTimeout(() => {
+                                startTicks(ws, market);
+                            }, timer);
+
                         } else {
                             // stake = amountPutForTrading;
                             stake = (updatedAccountBalance * (2 / 100)).toFixed(2);
