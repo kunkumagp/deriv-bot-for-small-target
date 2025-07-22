@@ -259,7 +259,9 @@ function startWebSocket() {
 
                         } else {
                             // stake = amountPutForTrading;
-                            stake = (updatedAccountBalance * (2 / 100)).toFixed(2);
+                            if(currentLossAmount == 0){
+                                stake = (updatedAccountBalance * (2 / 100)).toFixed(2);
+                            }
 
                             placeOverUnderTrade(stake); 
                             tickHistory = [];
