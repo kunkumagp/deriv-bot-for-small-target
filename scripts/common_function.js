@@ -4,6 +4,7 @@ let initialAccountBalance = 0,
     amountPutForTrading,
     stake,
     targetAmount,
+    sessionTargetPercentage = 2,
     dayTargetPercentage = 5,
     amountPercentage = 0.35,
     targetPercentage = 0.1,
@@ -33,6 +34,9 @@ const accounts = [
     // { name: "KUNKUMAGP Real", value: "Y71P0GIOxz3YYvr" },
     { name: "Kunkuma Trading", value: "YbaIy3dD51g2eoO" },
     { name: "W H K G Prasanna 85", value: "iVOpdm24hBhw3JI" },
+    { name: "Zion Music 1985", value: "pfn80VW8Lexav5O" },
+
+    
 ];
 
 const marketArray = [
@@ -617,6 +621,7 @@ function setInfo(contract, lastTradeProfit) {
 }
 
 
+
 function reserParams() {
     currentProfitAmount = 0;
     currentLossAmount = 0;
@@ -703,4 +708,15 @@ function weClose() {
 function resetBot() {
     localStorage.clear();
     reload();
+}
+
+function updateNewAccBalance() {
+    let updatedAccountBalanceDisplay = null;
+    if (updatedAccountBalance > initialAccountBalance) {
+        updatedAccountBalanceDisplay = `<span class="green">$ ${updatedAccountBalance.toFixed(2)}</span>`;
+    } else if (updatedAccountBalance < initialAccountBalance) {
+        updatedAccountBalanceDisplay = `<span class="red">$ ${updatedAccountBalance.toFixed(2)}</span>`;
+    }
+
+    setAccountInfo("updatedAccountBalance", `${updatedAccountBalanceDisplay}`);
 }

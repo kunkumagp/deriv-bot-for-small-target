@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSocket Trigger</title>
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css"
+    />
+    <link rel="stylesheet" href="./main.css" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+  </head>
+  <body>
+    <a class="btn btn-default btn-back" href="../index.html">< Back</a>
+    <div class="container" style="text-align: center">
+      <h1>Advance Bot</h1>
+
+      <div class="row">
+        <div class="col-md-6">
+          <div class="params">
+            <div class="form-field">
+              <div class="form-title">Account :</div>
+              <div class="form-element">
+                <select class="form-control" id="account_select"></select>
+              </div>
+            </div>
+            <div class="form-field">
+              <div class="form-title">Market :</div>
+              <div class="form-element">
+                <select class="form-control" id="market"></select>
+              </div>
+            </div>
+            <div class="form-field">
+              <div class="form-title">Target Profit :</div>
+              <div class="form-element">
+                <input
+                  type="text"
+                  id="target_profit"
+                  class="form-control"
+                  value=""
+                />
+              </div>
+            </div>
+            <div class="form-field">
+              <div class="form-title">Initial Stake :</div>
+              <div class="form-element">
+                <input
+                  type="text"
+                  id="initial_stake"
+                  class="form-control"
+                  value=""
+                />
+              </div>
+            </div>
+            <div class="form-field">
+              <button class="btn btn-default btn-block" id="resetBot">
+                Reset
+              </button>
+            </div>
+            <div class="form-field">
+              <button class="btn btn-default btn-block " id="startBot">
+                Start Bot
+              </button>
+            </div>
+            <div class="flash-notification">
+              <!-- Bot will run again in <span class="number">10</span> seconds. -->
+              <!-- Trade will close in <span class="number">10</span> tick. -->
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="account-info">
+            <div class="field">
+              <span>Initial Account Balance : </span
+              ><span id="initialAccountBalance">-</span>
+            </div>
+            <div class="field">
+              <span>Target Amount Per Trade : </span><span id="targetProfitAmountPerTrade">-</span>
+            </div>
+            <div class="field">
+              <span>Initial Amount Per Trade : </span
+              ><span id="initialAmountPerTrade">-</span>
+            </div>
+
+            <div class="line-break"></div>
+            
+            <div class="field">
+              <span>Updated Balance : </span
+              ><span id="updatedAccountBalance">-</span>
+            </div>
+            <div class="field">
+              <span>Net Profit : </span
+              ><span id="net_profit">-</span>
+            </div>
+
+            <div class="line-break"></div>
+
+            <div class="field">
+              <span>Total Trade Count : </span
+              ><span id="totalTradeCount">-</span>
+            </div>
+            <div class="field">
+              <span>Win count : </span><span id="winCount">-</span>
+            </div>
+            <div class="field">
+              <span>Loss count : </span><span id="lossCount">-</span>
+            </div>
+
+            <div class="line-break"></div>
+
+            <div class="field">
+              <span>Profit amount since start : </span
+              ><span id="totalProfit">-</span>
+            </div>
+            <div class="field">
+              <span>Loss amount since start : </span
+              ><span id="totalLoss">-</span>
+            </div>
+
+            <div class="line-break"></div>
+
+            <div class="field">
+              <span>Current Profit Amount : </span
+              ><span id="currentProfitAmount">-</span>
+            </div>
+            <div class="field">
+              <span>Current Loss Amount : </span
+              ><span id="currentLossAmount">-</span>
+            </div>
+            <!-- <div class="field"><span>xxxxxxxxxx : </span><span id="xxxxxxxxxx">-</span></div> -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container" style="text-align: center">
+      <div class="row">
+        <div class="col-md-12">
+          <div
+            class="result-notification"
+            style="text-align: left; max-height: 52vh; overflow: auto"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+ 
+
+    <script src="./scripts/common_function.js"></script>
+    <script src="./bot-update_2.js"></script>
+    
+  </body>
+</html>
