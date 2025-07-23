@@ -168,7 +168,7 @@ function startWebSocket() {
                 if(currentLossAmount < 0){
                     tickArrayCount = 2;
                 } else {
-                    tickArrayCount = 1;
+                    tickArrayCount = 2;
                 }
 
                 storeTickData(currentTick, tickArrayCount);
@@ -232,9 +232,7 @@ function startWebSocket() {
                         } else {
                             lostCountInRow = 0;
 
-                            if(winTradeCount >= 5 && currentLossAmount == 0){
-                                reload();
-                            }
+                            
                         }
 
                         
@@ -263,10 +261,17 @@ function startWebSocket() {
                                 stake = (updatedAccountBalance * (2 / 100)).toFixed(2);
                             }
 
-                            placeOverUnderTrade(stake); 
-                            tickHistory = [];
-                            // checkBalance();
-                            startTicks(ws, market);
+                            if(winTradeCount >= 5 && currentLossAmount == 0){
+                                setTimeout(() => {
+                                    reload();
+                                }, 10000);
+                            } else {
+                                placeOverUnderTrade(stake); 
+                                tickHistory = [];
+                                // checkBalance();
+                                startTicks(ws, market);
+                            }
+                            
                         }
                     } else {
                         setTimeout(() => {

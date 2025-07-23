@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSocket Trigger</title>
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css"
+    />
+    <link rel="stylesheet" href="./main.css" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+  </head>
+  <body>
+    <div class="container" style="text-align: center">
+      <h1>Test</h1>
+    </div>
+
+    <script src="./test.js"></script>
+    
+  </body>
+</html>
+
+
+
+
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Digit Prediction Tracker</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th { background-color: #f4f4f4; }
+    .correct { color: green; font-weight: bold; }
+    .incorrect { color: red; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<h2>Digit Prediction Tracker</h2>
+<p><strong>Correct:</strong> <span id="correctCount">0</span> | <strong>Incorrect:</strong> <span id="incorrectCount">0</span></p>
+<button onclick="downloadCSV()">Download CSV</button>
+
+<table id="predictionTable">
+  <thead>
+    <tr>
+      <th>Predicted</th>
+      <th>Actual</th>
+      <th>Result</th>
+      <th>Timestamp</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+const market = 'R_100';
+const apiToken = 'lkUxtOopvUhCpIX';
+let ws, subscriptionId;
+let correct = 0, incorrect = 0;
+const logData = [];
+
+const updateUI = (predicted, actual, result) => {
+  const table = document.querySelector("#predictionTable tbody");
+  const row = document.createElement("tr");
+  row.innerHTML = `
+    <td>${predicted}</td>
+    <td>${actual}</td>
+    <td class="${result === 'Correct' ? 'correct' : 'incorrect'}">${result}</td>
+    <td>${new Date().toLocaleTimeString()}</td>
+  `;
+  table.prepend(row);
+
+  document.getElementById("correctCount").textContent = correct;
+  document.getElementById("incorrectCount").textContent = incorrect;
+};
+
+const downloadCSV = () => {
+  let csvContent = "Predicted,Actual,Result,Timestamp\n";
+  csvContent += logData.map(row => row.join(",")).join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "prediction_log.csv";
+  link.click();
+};
+
+function predictNextDigit(prices) {
+  if (!Array.isArray(prices) || prices.length < 5) return null;
+
+  const last5 = prices.slice(-5);
+  const last10 = prices.slice(-10);
+  const last20 = prices.slice(-20);
+
+  const avg = arr => arr.reduce((sum, val) => sum + parseFloat(val), 0) / arr.length;
+  const weightedAvg = (avg(last5) * 0.5) + (avg(last10) * 0.3) + (avg(last20) * 0.2);
+  const formatted = weightedAvg.toFixed(2);
+
+  const lastDigit = formatted.split('.')[1]?.[1] || '0'; // second decimal digit
+  return parseInt(lastDigit) % 2 === 0 ? 'Even' : 'Odd';
+}
+
+function getAuthentication(token) {
+  ws.send(JSON.stringify({ authorize: token }));
+}
+
+function requestTicksHistory(symbol) {
+  ws.send(JSON.stringify({
+    ticks_history: symbol,
+    end: 'latest',
+    count: 1000,
+    style: 'ticks'
+  }));
+}
+
+function startTicks(symbol) {
+  ws.send(JSON.stringify({ ticks: symbol, subscribe: 1 }));
+}
+
+function stopTicks() {
+  if (subscriptionId) {
+    ws.send(JSON.stringify({ forget: subscriptionId }));
+  }
+}
+
+let predictedParity = null;
+
+ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
+
+ws.onopen = () => {
+  console.log("WebSocket connected");
+  getAuthentication(apiToken);
+};
+
+ws.onmessage = (event) => {
+  const res = JSON.parse(event.data);
+  if (!res) return;
+
+  if (res.msg_type === "authorize") {
+    console.log("Authorized");
+    requestTicksHistory(market);
+  }
+
+  if (res.msg_type === "history") {
+    predictedParity = predictNextDigit(res.history.prices);
+    console.log("Predicted next digit parity:", predictedParity);
+    startTicks(market);
+  }
+
+  if (res.msg_type === "tick") {
+    console.log(res);
+
+    const tickValue = parseFloat(res.tick.quote).toFixed(2);
+    const actualDigit = tickValue.split('.')[1]?.[1] || '0';
+    const actualParity = parseInt(actualDigit) % 2 === 0 ? 'Even' : 'Odd';
+
+    const result = predictedParity === actualParity ? 'Correct' : 'Incorrect';
+    if (result === 'Correct') correct++; else incorrect++;
+
+    updateUI(predictedParity, actualParity, result);
+    logData.push([predictedParity, actualParity, result, new Date().toLocaleTimeString()]);
+    stopTicks();
+
+    setTimeout(() => requestTicksHistory(market), 10000);
+  }
+
+  if (res.msg_type === "error") {
+    console.error("Error:", res.error.message);
+  }
+
+  if (res.subscription) {
+    subscriptionId = res.subscription.id;
+  }
+};
+</script>
+</body>
+</html> -->
