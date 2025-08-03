@@ -5,9 +5,9 @@ let targetProfitAmountPerTrade,
     targetProfitPercentagePerTrade = 0.1,
     initialAmountPerTrade,
     amountPercentagePerTrade = 0.35,
-    targetProfitPercentagePerDay = 10,
+    targetProfitPercentagePerDay = 25,
     targetProfitAmountPerDay,
-    targetProfitPercentagePerSession = 2,
+    targetProfitPercentagePerSession = 1,
     targetProfitAmountPerSession,
     targetCapitalForDay,
     timeInterval = 0
@@ -43,6 +43,8 @@ apiToken = accountSelectElement.value;
 accountSelectElement.addEventListener("change", () => {
     apiToken = accountSelectElement.value;
 });
+
+resetBotButton.addEventListener('click', resetBot);
 
 market = getRandomMarket(marketArray, '');
 
@@ -85,8 +87,9 @@ function startWebSocket() {
 
                     // Set Account Details and trading Data
                     setAccData(wsResponse.authorize);
+                    let tcfd = localStorage.getItem('targetCapitalForDay');
 
-                    if (targetCapitalForDay > 0 && initialAccountBalance >= targetCapitalForDay) {
+                    if (tcfd > 0 && initialAccountBalance >= tcfd) {
                         setFlashNotification("Day target is done", 0);
                         console.log("Day target is done");
                     } else {
@@ -185,10 +188,14 @@ function startWebSocket() {
                             localStorage.setItem("currentLossAmount", currentLossAmount);
                             localStorage.setItem("lossTradeCount", lossTradeCount);
 
-                            timeInterval = (getRandomNumber(1, 15) * 1000 );
+                            timeInterval = 0;
+                            if(lostCountInRow >= 2){
+                                timeInterval = (getRandomNumber(10, 60) * 1000 );
+                            }
+                            // timeInterval = (getRandomNumber(10, 60) * 1000 );
                             setTimer(timeInterval);
                             setTimeout(() => {
-                                // runPrediction();
+                                runPrediction();
                             }, timeInterval);
 
                         } else {
@@ -198,7 +205,8 @@ function startWebSocket() {
                             localStorage.removeItem("lossTradeCount");
 
                             if (currentProfitAmount >= targetProfitAmountPerSession) {
-                                timeInterval = (getRandomNumber(30, 90) * 1000 );
+                                timeInterval = (getRandomNumber(300, 400) * 1000 );
+                                // timeInterval = (getRandomNumber(1800, 2000) * 1000 );
 
                                 setTimer(timeInterval);
                                 setTimeout(() => {
@@ -206,7 +214,7 @@ function startWebSocket() {
                                 }, timeInterval);
                                 
                             } else {
-                                // runPrediction();
+                                runPrediction();
                             }
 
                         }
@@ -262,15 +270,18 @@ function setAccData(accData) {
     localStorage.setItem('targetProfitAmountPerSession', targetProfitAmountPerSession);
 
 
+    if(!localStorage.getItem('targetCapitalForDay')){
+        targetCapitalForDay = (Number(initialAccountBalance) + Number(targetProfitAmountPerDay));
+    } else {
+        targetCapitalForDay = localStorage.getItem('targetCapitalForDay');
+    }
     
-
 
     if(!localStorage.getItem('date')){
         // Set New Date
         localStorage.setItem('date', now.toLocaleDateString());
 
         // Set Target Capital For Day
-        targetCapitalForDay = (Number(initialAccountBalance) + Number(targetProfitAmountPerDay));
         localStorage.setItem('targetCapitalForDay', targetCapitalForDay);
 
     } else {
@@ -279,7 +290,6 @@ function setAccData(accData) {
             localStorage.setItem('date', now.toLocaleDateString());
             
             // Set Target Capital For Day
-            targetCapitalForDay = (Number(initialAccountBalance) + Number(targetProfitAmountPerDay));
             localStorage.setItem('targetCapitalForDay', targetCapitalForDay);
         }
     }
@@ -306,17 +316,17 @@ function updateDetails(contract, lastTradeProfit) {
         winTradeCount = winTradeCount + 1;
         lostCountInRow = 0;
         totalProfitAmount = totalProfitAmount + lastTradeProfit;
-
-        updatedAccountBalance = updatedAccountBalance + stake + lastTradeProfit;
-
     } else {
         lossTradeCount = lossTradeCount + 1;
         lostCountInRow = lostCountInRow + 1;
         totalLossAmount = totalLossAmount + lastTradeProfit;
-
-        updatedAccountBalance = updatedAccountBalance + lastTradeProfit;
-
     }
+
+    currentProfitAmount = currentProfitAmount + lastTradeProfit;
+    currentLossAmount = currentLossAmount + lastTradeProfit;
+    if(currentLossAmount >= 0){currentLossAmount = 0;}
+
+    updatedAccountBalance = updatedAccountBalance + currentProfitAmount;
 
     netProfit = updatedAccountBalance - initialAccountBalance;
 
@@ -325,6 +335,59 @@ function updateDetails(contract, lastTradeProfit) {
     console.log('updatedAccountBalance : ', updatedAccountBalance);
     console.log('netProfit : ', netProfit);
     console.log('-------------------------------------');
+
+    setResultNotification(
+        lastTradeId,
+        tradeType,
+        market,
+        contract.buy_price,
+        lastTradeProfit
+    );
+
+    setAccountInfo("totalTradeCount", `${totalTradeCount}`);
+    setAccountInfo("winCount", `${winTradeCount}`);
+    setAccountInfo("lossCount", `${lossTradeCount}`);
+
+
+    let updatedAccountBalanceDisplay = null;
+    if (updatedAccountBalance > initialAccountBalance) {
+        updatedAccountBalanceDisplay = `<span class="green">$ ${updatedAccountBalance.toFixed(2)}</span>`;
+    } else if (updatedAccountBalance < initialAccountBalance) {
+        updatedAccountBalanceDisplay = `<span class="red">$ ${updatedAccountBalance.toFixed(2)}</span>`;
+    }
+    setAccountInfo("updatedAccountBalance", `${updatedAccountBalanceDisplay}`);
+
+
+    let netProfitDisplay = null;
+    if (netProfit > 0) {
+        netProfitDisplay = `<span class="green">$ ${netProfit.toFixed(2)}</span>`;
+    } else if (netProfit < 0) {
+        netProfitDisplay = `<span class="red">$ ${netProfit.toFixed(2)}</span>`;
+    }
+    setAccountInfo("net_profit", `${netProfitDisplay}`);
+  
+
+    let currentProfitAmountDisplay = null;
+    if (currentProfitAmount < 0) {
+        currentProfitAmountDisplay = `<span class="red">$ ${currentProfitAmount.toFixed(2)}</span>`;
+    } else if (currentProfitAmount > 0) {
+        currentProfitAmountDisplay = `<span class="green">$ ${currentProfitAmount.toFixed(2)}</span>`;
+    } else {
+        currentProfitAmountDisplay = `$ ${currentProfitAmount.toFixed(2)}`;
+    }
+    setAccountInfo("currentProfitAmount", `${currentProfitAmountDisplay}`);
+
+
+
+    let currentLossAmountDisplay = null;
+    if (currentLossAmount < 0) {
+        currentLossAmountDisplay = `<span class="red">$ ${currentLossAmount.toFixed(2)}</span>`;
+    } else if (currentLossAmount > 0) {
+        currentLossAmountDisplay = `<span class="green">$ ${currentLossAmount.toFixed(2)}</span>`;
+    } else {
+        currentLossAmountDisplay = `$ ${currentLossAmount.toFixed(2)}`;
+    }
+    setAccountInfo("currentLossAmount", `${currentLossAmountDisplay}`);
 
 
     
