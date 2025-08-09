@@ -42,7 +42,7 @@ const accounts = [
 const marketArray = [
     { value: "R_10", name: "Volatility 10 Index" },
     // { value: "R_25", name: "Volatility 25 Index" },
-    // { value: "R_50", name: "Volatility 50 Index" },
+    { value: "R_50", name: "Volatility 50 Index" },
     // { value: "R_75", name: "Volatility 75 Index" },
     { value: "R_100", name: "Volatility 100 Index" },
 ];
@@ -146,7 +146,8 @@ function setAccountDetailsForLossRecover(account) {
 function placeTrade(prediction = null, duration = null) {
     if (isTradeOpen == false) {
         let tradeState;
-        let tickCount = duration || getRandomNumber(5, 8);
+        let tickCount = 1;
+        // let tickCount = duration || getRandomNumber(5, 8);
 
         if (prediction != null) {
             if (prediction == "even") {

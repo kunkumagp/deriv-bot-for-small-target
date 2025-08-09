@@ -1,7 +1,7 @@
 let ws, apiToken, intervalId;
 let isRunning2 = false;
 
-let fullAmount = 300;
+let fullAmount = 200;
 
 let targetProfitAmountPerTrade,
     targetProfitPercentagePerTrade = 0.1,
@@ -192,7 +192,9 @@ function startWebSocket() {
 
                             timeInterval = 0;
                             if(lostCountInRow >= 2){
-                                timeInterval = (getRandomNumber(50, 80) * 1000 );
+                                timeInterval = (getRandomNumber(1, 90) * 1000 );
+                                market = getRandomMarket(marketArray, market);
+
                             }
                             // timeInterval = (getRandomNumber(10, 60) * 1000 );
                             setTimer(timeInterval);
@@ -331,7 +333,7 @@ function updateDetails(contract, lastTradeProfit) {
     updatedAccountBalance = updatedAccountBalance + currentProfitAmount;
 
     netProfit = updatedAccountBalance - initialAccountBalance;
-
+    updateNewAccBalance();
 
     console.log('-------------------------------------');
     console.log('updatedAccountBalance : ', updatedAccountBalance);
