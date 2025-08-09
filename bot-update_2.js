@@ -1,11 +1,13 @@
 let ws, apiToken, intervalId;
 let isRunning2 = false;
 
+let fullAmount = 300;
+
 let targetProfitAmountPerTrade,
     targetProfitPercentagePerTrade = 0.1,
     initialAmountPerTrade,
     amountPercentagePerTrade = 0.35,
-    targetProfitPercentagePerDay = 25,
+    targetProfitPercentagePerDay = 50,
     targetProfitAmountPerDay,
     targetProfitPercentagePerSession = 1,
     targetProfitAmountPerSession,
@@ -89,19 +91,19 @@ function startWebSocket() {
                     setAccData(wsResponse.authorize);
                     let tcfd = localStorage.getItem('targetCapitalForDay');
 
-                    if (tcfd > 0 && initialAccountBalance >= tcfd) {
-                        setFlashNotification("Day target is done", 0);
-                        console.log("Day target is done");
-                    } else {
-                        // setFlashNotification("Start Trading", 0);
-                        // console.log("Start Trading");
+                    // if (tcfd > 0 && initialAccountBalance >= tcfd) {
+                    //     setFlashNotification("Day target is done", 0);
+                    //     console.log("Day target is done");
+                    // } else {
+                    //     // setFlashNotification("Start Trading", 0);
+                    //     // console.log("Start Trading");
 
-                        console.log("Run prediction and trade");
-                        setFlashNotification("Run prediction and trade", 0);
-                        runPrediction();
                         
-                    }
+                    // }
 
+                    console.log("Run prediction and trade");
+                    setFlashNotification("Run prediction and trade", 0);
+                    runPrediction();
 
                 } else if (wsResponse?.error?.code !== undefined && wsResponse.error.code === "WrongResponse") {
                     reload();
@@ -190,7 +192,7 @@ function startWebSocket() {
 
                             timeInterval = 0;
                             if(lostCountInRow >= 2){
-                                timeInterval = (getRandomNumber(10, 60) * 1000 );
+                                timeInterval = (getRandomNumber(50, 80) * 1000 );
                             }
                             // timeInterval = (getRandomNumber(10, 60) * 1000 );
                             setTimer(timeInterval);
@@ -205,7 +207,7 @@ function startWebSocket() {
                             localStorage.removeItem("lossTradeCount");
 
                             if (currentProfitAmount >= targetProfitAmountPerSession) {
-                                timeInterval = (getRandomNumber(300, 400) * 1000 );
+                                timeInterval = (getRandomNumber(300, 600) * 1000 );
                                 // timeInterval = (getRandomNumber(1800, 2000) * 1000 );
 
                                 setTimer(timeInterval);
@@ -254,19 +256,19 @@ function setAccData(accData) {
 
 
     // Set Target Profit Amount Per Trade
-    targetProfitAmountPerTrade = (initialAccountBalance * (targetProfitPercentagePerTrade / 100)).toFixed(2);
+    targetProfitAmountPerTrade = (initialAccountBalance * (targetProfitPercentagePerTrade / fullAmount)).toFixed(2);
     setAccountInfo("targetProfitAmountPerTrade", `$ ${targetProfitAmountPerTrade}`);
 
     // Set Target Profit Amount Per Trade
-    initialAmountPerTrade = (initialAccountBalance * (amountPercentagePerTrade / 100)).toFixed(2);
+    initialAmountPerTrade = (initialAccountBalance * (amountPercentagePerTrade / fullAmount)).toFixed(2);
     setAccountInfo("initialAmountPerTrade", `$ ${initialAmountPerTrade}`);
 
     // Set Target Profit Amount Per Day
-    targetProfitAmountPerDay = (initialAccountBalance * (targetProfitPercentagePerDay / 100)).toFixed(2);
+    targetProfitAmountPerDay = (initialAccountBalance * (targetProfitPercentagePerDay / fullAmount)).toFixed(2);
     localStorage.setItem('targetProfitAmountPerDay', targetProfitAmountPerDay);
 
     // Set Target Profit Amount Per Session
-    targetProfitAmountPerSession = (initialAccountBalance * (targetProfitPercentagePerSession / 100)).toFixed(2);
+    targetProfitAmountPerSession = (initialAccountBalance * (targetProfitPercentagePerSession / fullAmount)).toFixed(2);
     localStorage.setItem('targetProfitAmountPerSession', targetProfitAmountPerSession);
 
 
