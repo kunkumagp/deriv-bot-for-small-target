@@ -27,7 +27,8 @@ let initialAccountBalance = 0,
 const now = new Date();
 
 const martingaleMultiplier1 = 2.07112,
-    martingaleMultiplier2 = 1.3;
+    martingaleMultiplier2 = 1.3,
+    martingaleMultiplier3 = 3.5;
 
 const accounts = [
     { name: "KunkumaGP", value: "lkUxtOopvUhCpIX" },
@@ -143,40 +144,63 @@ function setAccountDetailsForLossRecover(account) {
 
 }
 
-function placeTrade(prediction = null, duration = null) {
+function placeTrade(prediction = null, duration = null , tradeingType = null) {
     if (isTradeOpen == false) {
         let tradeState;
         let tickCount = duration || getRandomNumber(5, 8);
+        let tradeRequest;
 
-        if (prediction != null) {
-            if (prediction == "even") {
-                tradeState = "DIGITEVEN";
-            } else if (prediction == "odd") {
-                tradeState = "DIGITODD";
-            }
+        if(tradeingType == 'ou'){
+            tradeState = "DIGITOVER";
+            tradeType = "over";
+            stake = Number(stake);
+            stake < 0.35 ? (stake = 0.35) : (stake = stake);
+    
+            tradeRequest = {
+                proposal: 1,
+                amount: newStake.toFixed(2),
+                basis: 'stake',
+                contract_type: 'DIGITOVER',
+                currency: 'USD',
+                duration: 1,
+                duration_unit: 't',
+                symbol: market,
+                barrier: 2
+              };
+
         } else {
-            if (tradeType == "even") {
-                tradeState = "DIGITEVEN";
-                tradeType = "odd";
-            } else if (tradeType == "odd") {
-                tradeState = "DIGITODD";
-                tradeType = "even";
+            if (prediction != null) {
+                if (prediction == "even") {
+                    tradeState = "DIGITEVEN";
+                } else if (prediction == "odd") {
+                    tradeState = "DIGITODD";
+                }
+            } else {
+                if (tradeType == "even") {
+                    tradeState = "DIGITEVEN";
+                    tradeType = "odd";
+                } else if (tradeType == "odd") {
+                    tradeState = "DIGITODD";
+                    tradeType = "even";
+                }
             }
+
+            stake = Number(stake);
+            stake < 0.35 ? (stake = 0.35) : (stake = stake);
+    
+            tradeRequest = {
+                proposal: 1,
+                amount: stake.toFixed(2),
+                basis: "stake",
+                contract_type: tradeState,
+                currency: "USD",
+                duration: tickCount,
+                duration_unit: "t",
+                symbol: market,
+            };
         }
 
-        stake = Number(stake);
-        stake < 0.35 ? (stake = 0.35) : (stake = stake);
 
-        const tradeRequest = {
-            proposal: 1,
-            amount: stake.toFixed(2),
-            basis: "stake",
-            contract_type: tradeState,
-            currency: "USD",
-            duration: tickCount,
-            duration_unit: "t",
-            symbol: market,
-        };
 
         tradesOn = true;
 
@@ -186,9 +210,43 @@ function placeTrade(prediction = null, duration = null) {
     }
 }
 
-function runScript(prediction) {
+
+
+function placeOUTrade(market) {
+    console.log(market);
+    if (isTradeOpen == false) {
+        let tradeState;
+        let tradeRequest;
+
+        tradeState = "DIGITOVER";
+        tradeType = "over";
+        stake = Number(stake);
+        stake < 0.35 ? (stake = 0.35) : (stake = stake);
+
+        tradeRequest = {
+            proposal: 1,
+            amount: stake.toFixed(2),
+            basis: 'stake',
+            contract_type: 'DIGITOVER',
+            currency: 'USD',
+            duration: 1,
+            duration_unit: 't',
+            symbol: market,
+            barrier: 2
+            };
+
+
+        tradesOn = true;
+
+        onTradeCount = 1;
+        console.log("Sending trade request with prediction:", tradeRequest);
+        ws.send(JSON.stringify(tradeRequest));
+    }
+}
+
+function runScript(prediction,tradeType = null) {
     isRunning = true;
-    placeTrade(prediction.prediction, prediction.duration);
+    placeTrade(prediction.prediction, prediction.duration, tradeType);
 }
 
 // Improved EvenOddPredictor class with dynamic strategy weighting, confidence refinement,
@@ -405,15 +463,15 @@ const predictor = new EvenOddPredictor();
 
 
 
-async function runPredictionAndTrade() {
+async function runPredictionAndTrade(tradeType = null) {
     try {
         const prediction = await predictor.predictNext();
         console.log("Prediction Result:", prediction);
-        runScript(prediction);
+        runScript(prediction,tradeType);
         return prediction;
     } catch (error) {
         console.error("Prediction error:", error);
-        placeTrade();
+        placeTrade(tradeType);
         return null;
     }
 }
@@ -509,8 +567,8 @@ function setTickCountDown(tickCount, tick) {
 }
 
 
-function runPrediction() {
-    runPredictionAndTrade().then(prediction => {
+function runPrediction(tradeType = null) {
+    runPredictionAndTrade(tradeType).then(prediction => {
         if (prediction) {
             setFlashNotification(`Next trade: ${prediction.prediction.toUpperCase()} (${(prediction.confidence * 100).toFixed(1)}% confidence)`, 5);
         }
