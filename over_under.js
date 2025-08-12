@@ -6,6 +6,7 @@ const resetBotButton = document.getElementById("resetBot");
 
 let ws, apiToken, intervalId;
 let isRunning = false;
+let lossRecoveryStatus = false;
 
 let targetProfitPercentagePerSession = 5,
 amountPercentagePerTrade = 0.35,
@@ -35,8 +36,8 @@ apiToken = accountSelectElement.value;
 let sessionProfit = 0;
 let logMessage;
 
-// market = getRandomMarket(marketArray, '');
-market = "R_50";
+market = getRandomMarket(marketArray, '');
+// market = "R_50";
 
 resetBotButton.addEventListener('click', resetBot);
 
@@ -71,7 +72,7 @@ function startWebSocket(){
         wsResponse = JSON.parse(event.data);
 
         if (wsResponse != null) {
-            console.log('wsResponse : ',wsResponse);
+            // console.log('wsResponse : ',wsResponse);
 
 
             if (wsResponse.msg_type === "authorize") {
@@ -172,45 +173,79 @@ function startWebSocket(){
 
                         updateDetails(contract, profit);
 
-                        stakeChangeForOU(result);
                         isTradeOpen = false;
 
+                        if(lossRecoveryStatus){
 
-                        if (currentLossAmount < 0) {
-                            // When Trade Loss
-
-                            timeInterval = 0;
-                            
-                            if(lostCountInRow >= 1){
-                                timeInterval = (getRandomNumber(60, 90) * 1000 );
-                            }
-
-                            setTimer(timeInterval);
-                            setTimeout(() => {
-                                runScriptForTrade();
-                            }, timeInterval);
+                            lossRecovery(profit);
+                            runScriptForTrade();
 
                         } else {
-                            // When Trade Win
+                            stakeChangeForOU(result);
 
-                            localStorage.removeItem("currentLossAmount");
-                            localStorage.removeItem("lossTradeCount");
-
-                            if(currentProfitAmount >= targetProfitPerSession){
-                                timeInterval = (getRandomNumber(300, 600) * 1000 );
-
-                                console.log('timeInterval : ', timeInterval);
-
-                                setTimer(timeInterval);
-                                setTimeout(() => {
-                                    reload();
-                                }, timeInterval);
-                            } else {
-                                runScriptForTrade();
+                            if (currentLossAmount < 0) {
+                                // When Trade Loss
+    
+                                timeInterval = 0;
                                 
-                            }
+                                if(lostCountInRow >= 3){
+                                    // timeInterval = (getRandomNumber(60, 90) * 1000 );
+                                    timeInterval = (getRandomNumber(120, 180) * 1000 );
+                                    localStorage.setItem('currentLossAmount',currentLossAmount);
+    
+    
+                                    setTimer(timeInterval);
+                                    setTimeout(() => {
+                                        reload();
+                                    }, timeInterval);
+    
+                                } else {
+                                    if(lostCountInRow >= 2){
+                                        // timeInterval = (getRandomNumber(60, 90) * 1000 );
+                                        timeInterval = (getRandomNumber(60, 90) * 1000 );
+                                    } else {
+                                        timeInterval = (getRandomNumber(1, 15) * 1000 );
+                                    }
+    
+                                    setTimer(timeInterval);
+                                    setTimeout(() => {
+                                        runScriptForTrade();
+                                    }, timeInterval);
+    
+                                }
+    
+                                
+    
+                            } else {
+                                // When Trade Win
+    
+                                localStorage.removeItem("lossTradeCount");
+    
+                                if(currentProfitAmount >= targetProfitPerSession){
+                                    timeInterval = (getRandomNumber(300, 600) * 1000 );
+    
+                                    console.log('timeInterval : ', timeInterval);
+    
+                                    setTimer(timeInterval);
+                                    setTimeout(() => {
+                                        reload();
+                                    }, timeInterval);
+                                } else {
+                                    timeInterval = (getRandomNumber(1, 5) * 1000 );
 
+                                    setTimer(timeInterval);
+                                    setTimeout(() => {
+                                        runScriptForTrade();
+
+                                    }, timeInterval);
+                                    
+                                }
+    
+                            }
                         }
+
+
+                     
 
 
                     } else {
@@ -234,10 +269,36 @@ function startWebSocket(){
 // ---------------------------------------------------------------------
 
 const stakeChangeForOU = (status) => {
+
+    if(localStorage.getItem('currentLossAmount')){
+        currentLossAmount = Number(localStorage.getItem('currentLossAmount'));
+        stake = Math.abs(Number(localStorage.getItem('currentLossAmount'))) * martingaleMultiplier2;
+    } else {
+        
+    }
+    
+
     if (status == "Loss") {
         stake = stake * martingaleMultiplier3;
     } else if (status == "Win") {
         stake = initialAmountPerTrade;
+    }
+};
+
+function lossRecovery(lastTradeProfit){
+    currentLossAmount = Number(localStorage.getItem('currentLossAmount')) + lastTradeProfit;
+    console.log('lastTradeProfit : ',lastTradeProfit);
+    console.log('currentLossAmount : ',currentLossAmount);
+
+    localStorage.setItem('currentLossAmount',currentLossAmount);
+    stake = Math.abs(Number(currentLossAmount)) * martingaleMultiplier2;
+
+    if(stake < initialAmountPerTrade){
+        stake = initialAmountPerTrade;
+    }
+
+    if(currentLossAmount >= 0){
+        lossRecoveryStatus = false;
     }
 };
 
@@ -269,8 +330,13 @@ function setAccData(accData) {
     setAccountInfo("initialAmountPerTrade", `$ ${initialAmountPerTrade}`);
     localStorage.setItem('initialAmountPerTrade', initialAmountPerTrade);
 
+    if(localStorage.getItem('currentLossAmount')){
+        stake = Math.abs(Number(localStorage.getItem('currentLossAmount'))) * martingaleMultiplier2;
+        lossRecoveryStatus = true;
+    } else {
+        stake = initialAmountPerTrade;
+    }
 
-    stake = initialAmountPerTrade;
 }
 
 

@@ -28,7 +28,7 @@ const now = new Date();
 
 const martingaleMultiplier1 = 2.07112,
     martingaleMultiplier2 = 1.3,
-    martingaleMultiplier3 = 3.5;
+    martingaleMultiplier3 = 3;
 
 const accounts = [
     { name: "KunkumaGP", value: "lkUxtOopvUhCpIX" },
@@ -213,7 +213,6 @@ function placeTrade(prediction = null, duration = null , tradeingType = null) {
 
 
 function placeOUTrade(market) {
-    console.log(market);
     if (isTradeOpen == false) {
         let tradeState;
         let tradeRequest;
@@ -553,7 +552,6 @@ function setResultNotification(
             console.log("Parent element not found.");
         }
     } else {
-        console.log('marketObj : ', marketObj);
         $(".result-notification").prepend(`<span class="stake-info" id="${contractId}"><span class="detailt"><span>Contract ID : </span><span class="contract-info">${contractId}</span></span><span class="detailt"><span>Market : </span><span class="contract-info">${marketObj.name}</span></span><span class="detailt"><span>Type : </span><span class="contract-info">${tradeTypeDisplay}</span></span><span class="detailt"><span>Stake : </span><span class="contract-info">${stake}</span></span><span class="detailt"><span>Profit / Loss Amount : </span><span class="contract-info" id="${contractId}-profit"><span class="">-</span></span></span><span class="detailt"><span>Status : </span><span class="contract-info" id="${contractId}-status"><span class="">-</span></span></span></span>`);
     }
 }
@@ -722,8 +720,6 @@ function getRandomNumber(min, max) {
 
 function setTimer(time) {
     let timeleft = time / 1000; // Convert milliseconds to seconds
-
-    console.log('timeleft : ', timeleft);
 
     if (!isRunning) {
         timeleft = 0;
