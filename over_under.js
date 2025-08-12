@@ -1,10 +1,13 @@
 const accountSelectElement = document.getElementById("account_select");
 const marketSelectElement = document.getElementById("market");
 
+const resetBotButton = document.getElementById("resetBot");
+
+
 let ws, apiToken, intervalId;
 let isRunning = false;
 
-let targetProfitPercentagePerSession = 10,
+let targetProfitPercentagePerSession = 5,
 amountPercentagePerTrade = 0.35,
 initialAmountPerTrade,
 targetProfitPerSession;
@@ -32,8 +35,10 @@ apiToken = accountSelectElement.value;
 let sessionProfit = 0;
 let logMessage;
 
-market = getRandomMarket(marketArray, '');
+// market = getRandomMarket(marketArray, '');
+market = "R_50";
 
+resetBotButton.addEventListener('click', resetBot);
 
 
 // ---------------------------------------------------------------------
@@ -81,18 +86,20 @@ function startWebSocket(){
                     setAccData(wsResponse.authorize);
                     let targetProfitPerSession = localStorage.getItem('targetProfitPerSession');
 
-                    if (targetProfitPerSession > 0 && sessionProfit >= targetProfitPerSession) {
-                        logMessage = 'Session target is completed.';
-                        setFlashNotification(logMessage, 0);
-                        console.log(logMessage);
-                    } else {
-                        // setFlashNotification("Start Trading", 0);
-                        // console.log("Start Trading");
-                        logMessage = 'Start Trading';
-                        console.log(logMessage);
-                        setFlashNotification(logMessage, 0);
-                        placeOUTrade(market);
-                    }
+                    // if (targetProfitPerSession > 0 && sessionProfit >= targetProfitPerSession) {
+                    //     logMessage = 'Session target is completed.';
+                    //     setFlashNotification(logMessage, 0);
+                    //     console.log(logMessage);
+                    // } else {
+                    //     // setFlashNotification("Start Trading", 0);
+                    //     // console.log("Start Trading");
+                    //     logMessage = 'Start Trading';
+                    //     console.log(logMessage);
+                    //     setFlashNotification(logMessage, 0);
+                    //     runScriptForTrade();
+                    // }
+                    runScriptForTrade();
+
 
 
                 } else if (wsResponse?.error?.code !== undefined && wsResponse.error.code === "WrongResponse") {
@@ -174,13 +181,13 @@ function startWebSocket(){
 
                             timeInterval = 0;
                             
-                            if(lostCountInRow >= 2){
-                                timeInterval = (getRandomNumber(3, 10) * 1000 );
+                            if(lostCountInRow >= 1){
+                                timeInterval = (getRandomNumber(60, 90) * 1000 );
                             }
 
                             setTimer(timeInterval);
                             setTimeout(() => {
-                                placeOUTrade(market);
+                                runScriptForTrade();
                             }, timeInterval);
 
                         } else {
@@ -192,12 +199,15 @@ function startWebSocket(){
                             if(currentProfitAmount >= targetProfitPerSession){
                                 timeInterval = (getRandomNumber(300, 600) * 1000 );
 
+                                console.log('timeInterval : ', timeInterval);
+
                                 setTimer(timeInterval);
                                 setTimeout(() => {
                                     reload();
                                 }, timeInterval);
                             } else {
-                                placeOUTrade(market);
+                                runScriptForTrade();
+                                
                             }
 
                         }
@@ -238,9 +248,11 @@ function setAccData(accData) {
     // Set Initial Account Balance
     initialAccountBalance = Number(accData.balance);
     setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
-    if(!localStorage.getItem('initialAccountBalance')){
-        localStorage.setItem('initialAccountBalance', initialAccountBalance);
-    }
+    localStorage.setItem('initialAccountBalance', initialAccountBalance);
+
+    // if(!localStorage.getItem('initialAccountBalance')){
+    //     localStorage.setItem('initialAccountBalance', initialAccountBalance);
+    // }
 
     // Set Updated Account Balance
     updatedAccountBalance = initialAccountBalance;
@@ -282,7 +294,7 @@ function updateDetails(contract, lastTradeProfit) {
     currentLossAmount = currentLossAmount + lastTradeProfit;
     if(currentLossAmount >= 0){currentLossAmount = 0;}
 
-    updatedAccountBalance = updatedAccountBalance + currentProfitAmount;
+    updatedAccountBalance = initialAccountBalance + currentProfitAmount;
 
     netProfit = updatedAccountBalance - initialAccountBalance;
     updateNewAccBalance();
@@ -348,4 +360,9 @@ function updateDetails(contract, lastTradeProfit) {
 
 
     
+}
+
+function runScriptForTrade() {
+    isRunning = true;
+    placeOUTrade(market);
 }

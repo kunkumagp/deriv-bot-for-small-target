@@ -42,9 +42,9 @@ const accounts = [
 
 const marketArray = [
     { value: "R_10", name: "Volatility 10 Index" },
-    // { value: "R_25", name: "Volatility 25 Index" },
-    // { value: "R_50", name: "Volatility 50 Index" },
-    // { value: "R_75", name: "Volatility 75 Index" },
+    { value: "R_25", name: "Volatility 25 Index" },
+    { value: "R_50", name: "Volatility 50 Index" },
+    { value: "R_75", name: "Volatility 75 Index" },
     { value: "R_100", name: "Volatility 100 Index" },
 ];
 
@@ -553,6 +553,7 @@ function setResultNotification(
             console.log("Parent element not found.");
         }
     } else {
+        console.log('marketObj : ', marketObj);
         $(".result-notification").prepend(`<span class="stake-info" id="${contractId}"><span class="detailt"><span>Contract ID : </span><span class="contract-info">${contractId}</span></span><span class="detailt"><span>Market : </span><span class="contract-info">${marketObj.name}</span></span><span class="detailt"><span>Type : </span><span class="contract-info">${tradeTypeDisplay}</span></span><span class="detailt"><span>Stake : </span><span class="contract-info">${stake}</span></span><span class="detailt"><span>Profit / Loss Amount : </span><span class="contract-info" id="${contractId}-profit"><span class="">-</span></span></span><span class="detailt"><span>Status : </span><span class="contract-info" id="${contractId}-status"><span class="">-</span></span></span></span>`);
     }
 }
@@ -721,6 +722,8 @@ function getRandomNumber(min, max) {
 
 function setTimer(time) {
     let timeleft = time / 1000; // Convert milliseconds to seconds
+
+    console.log('timeleft : ', timeleft);
 
     if (!isRunning) {
         timeleft = 0;
