@@ -3,6 +3,10 @@ const marketSelectElement = document.getElementById("market");
 
 const resetBotButton = document.getElementById("resetBot");
 
+// Max martingale steps before resetting stake
+let maxMartingaleSteps = 3;  // Only double stake 2 times in a row
+let cooldownLossStreak = 2;  // Cooldown after this many losses in a row
+
 
 let ws, apiToken, intervalId;
 let isRunning = false;
@@ -178,18 +182,18 @@ function startWebSocket(){
 
                         if (currentLossAmount < 0) {
                             // When Trade Loss
+                            // if (lostCountInRow >= cooldownLossStreak) {
+                            //     // let cooldown = getRandomNumber(60, 120) * 1000; // 1-2 min cooldown
+                            //     timeInterval = (getRandomNumber(60, 90) * 1000 );
 
-                            timeInterval = 0;
-                            
-                            if(lostCountInRow >= 1){
-                                timeInterval = (getRandomNumber(60, 90) * 1000 );
-                            }
-
-                            setTimer(timeInterval);
-                            setTimeout(() => {
-                                runScriptForTrade();
-                            }, timeInterval);
-
+                            //     console.log(`Cooldown triggered for ${timeInterval / 1000} seconds`);
+                            //     setTimer(timeInterval);
+                            //     setTimeout(() => runScriptForTrade(), timeInterval);
+                            // } else {
+                            //     setTimeout(() => runScriptForTrade(), 0);
+                            // }
+                            market = getRandomMarket(marketArray, market);
+                            runScriptForTrade()
                         } else {
                             // When Trade Win
 
@@ -197,7 +201,7 @@ function startWebSocket(){
                             localStorage.removeItem("lossTradeCount");
 
                             if(currentProfitAmount >= targetProfitPerSession){
-                                timeInterval = (getRandomNumber(300, 600) * 1000 );
+                                timeInterval = (getRandomNumber(60, 180) * 1000 );
 
                                 console.log('timeInterval : ', timeInterval);
 
@@ -234,10 +238,14 @@ function startWebSocket(){
 // ---------------------------------------------------------------------
 
 const stakeChangeForOU = (status) => {
-    if (status == "Loss") {
-        stake = stake * martingaleMultiplier3;
-    } else if (status == "Win") {
-        stake = initialAmountPerTrade;
+    if (status === "Loss") {
+        if (lostCountInRow <= maxMartingaleSteps) {
+            stake = stake * martingaleMultiplier3;
+        } else {
+            stake = initialAmountPerTrade; // Reset after limit reached
+        }
+    } else if (status === "Win") {
+        stake = initialAmountPerTrade; // Reset on win
     }
 };
 
