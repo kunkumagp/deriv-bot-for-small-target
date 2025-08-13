@@ -7,8 +7,8 @@ const resetBotButton = document.getElementById("resetBot");
 let ws, apiToken, intervalId;
 let isRunning = false;
 
-let targetProfitPercentagePerSession = 5,
-amountPercentagePerTrade = 0.35,
+let targetProfitPercentagePerSession = 3,
+amountPercentagePerTrade = 0.1,
 initialAmountPerTrade,
 targetProfitPerSession;
 
