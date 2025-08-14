@@ -1,24 +1,39 @@
 const accountSelectElement = document.getElementById("account_select");
 const marketSelectElement = document.getElementById("market");
-
 const resetBotButton = document.getElementById("resetBot");
 
-
-let ws, apiToken, intervalId;
+let ws, apiToken;
 let isRunning = false;
 
-let targetProfitPercentagePerSession = 3,
-amountPercentagePerTrade = 0.1,
-initialAmountPerTrade,
-targetProfitPerSession;
+// ====== CONFIGURATION ====== //
+const targetProfitPercentagePerSession = 2;  // % target for the session
+const amountPercentagePerTrade = 0.35;        // % of account for base stake
+const maxMartingaleSteps = 4;                 // Limit martingale steps
+const maxSequenceLossPercent = 5;             // Stop if loss > 5% of account in one streak
+// const probabilityCheckLength = 50;            // Ticks to check for digit frequency
+const probabilityCheckLength = 10;            // Ticks to check for digit frequency
 
+// For "Over 2" trades
+const targetDigits = [3, 4, 5, 6, 7, 8, 9];
+
+// ====== RUNTIME VARIABLES ====== //
+let minDelayAfterLoss = 60 * 1000;          // 1 min cooldown after loss streak
+let maxDigitProbability = 70;                // Max % occurrence to allow a trade
+let targetProfitPerSession = 0;
+let initialAmountPerTrade = 0;
+let martingaleStep = 0;
+let sequenceLossAmount = 0;
+let recentDigits = [];
+let sessionProfit = 0;
+let market = "R_50";
+
+// ====== POPULATE UI ====== //
 accounts.forEach((item) => {
     const option = document.createElement("option");
     option.value = item.value;
     option.textContent = item.name;
     accountSelectElement.appendChild(option);
 });
-
 
 marketArray.forEach((item) => {
     const option = document.createElement("option");
@@ -27,291 +42,204 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option);
 });
 
-
 accountSelectElement.value = "YbaIy3dD51g2eoO";
-marketSelectElement.value = "R_50";
+marketSelectElement.value = market;
 apiToken = accountSelectElement.value;
-
-let sessionProfit = 0;
-let logMessage;
-
-// market = getRandomMarket(marketArray, '');
-market = "R_50";
 
 resetBotButton.addEventListener('click', resetBot);
 
-
-// ---------------------------------------------------------------------
-
-
+// ====== START WEBSOCKET ====== //
 startWebSocket();
 
-function startWebSocket(){
+function startWebSocket() {
     ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
-    
-    ws.onopen = function () {
-        console.log("Connection open");
-        console.log(apiToken);
 
+    ws.onopen = () => {
+        console.log("Connection open");
         getAuthentication(ws, apiToken);
     };
 
-    ws.onclose = function () {
-        console.log("Connection closed");
-        console.log("-----------------------------\n");
-        // tradesOn = false;
-    };
+    ws.onclose = () => console.log("Connection closed");
+    ws.onerror = (err) => console.error("WebSocket error:", err);
 
-    ws.onerror = function (err) {
-        console.error("WebSocket error:", err);
-    };
+    ws.onmessage = (event) => {
+        const wsResponse = JSON.parse(event.data);
+        if (!wsResponse) return;
 
-
-    ws.onmessage = function (event) {
-        wsResponse = JSON.parse(event.data);
-
-        if (wsResponse != null) {
-            console.log('wsResponse : ',wsResponse);
-
-
-            if (wsResponse.msg_type === "authorize") {
-
-                console.log("Authorization successful.\n-----------------------------\n\n");
+        switch (wsResponse.msg_type) {
+            case "authorize":
+                console.log("Authorization successful.");
                 setFlashNotification("Authorization successful", 0);
-
-
-                if (wsResponse?.authorize?.balance !== undefined && wsResponse.authorize.balance !== null) {
-
-                    // Set Account Details and trading Data
+                if (wsResponse?.authorize?.balance !== undefined) {
                     setAccData(wsResponse.authorize);
-                    let targetProfitPerSession = localStorage.getItem('targetProfitPerSession');
+                    subscribeTicks(market);
+                    // Don't start trading immediately, wait until tick buffer is ready
+                }
+                break;
 
-                    // if (targetProfitPerSession > 0 && sessionProfit >= targetProfitPerSession) {
-                    //     logMessage = 'Session target is completed.';
-                    //     setFlashNotification(logMessage, 0);
-                    //     console.log(logMessage);
-                    // } else {
-                    //     // setFlashNotification("Start Trading", 0);
-                    //     // console.log("Start Trading");
-                    //     logMessage = 'Start Trading';
-                    //     console.log(logMessage);
-                    //     setFlashNotification(logMessage, 0);
-                    //     runScriptForTrade();
-                    // }
+            case "tick":
+                recordLastDigit(wsResponse.tick.quote);
+
+                // Start trading automatically when tick buffer is ready
+                if (!isRunning && recentDigits.length >= probabilityCheckLength) {
+                    isRunning = true;
+                    console.log("✅ Tick buffer ready. Starting trade loop...");
                     runScriptForTrade();
-
-
-
-                } else if (wsResponse?.error?.code !== undefined && wsResponse.error.code === "WrongResponse") {
-                    reload();
                 }
+                break;
 
+            case "proposal":
+                tradeProposal = wsResponse;
+                makeTheTrade(ws);
+                break;
 
-            }
-
-            if (wsResponse.msg_type === "proposal") {
-                if (
-                    updatedAccountBalance > 0 &&
-                    wsResponse.echo_req.amount > updatedAccountBalance
-                ) {
-                    // webSocketConnectionStop();
-                    console.log("Web socket connection lost");
-                    setFlashNotification("Web socket connection lost", 0);
-                } else {
-                    tradeProposal = wsResponse;
-                    makeTheTrade(ws);
-                }
-            }
-
-            if (wsResponse.msg_type === "buy") {
-                if (
-                    wsResponse.buy == undefined ||
-                    wsResponse.buy.contract_id == undefined
-                ) {
-                    // placeTrade();
-                } else {
-
+            case "buy":
+                if (wsResponse.buy?.contract_id) {
                     lastTradeId = wsResponse.buy.contract_id;
-                    totalTradeCount = totalTradeCount + 1;
-                    isTradeOpen = true;
-                    tradeTypeDisplay = "Digit Over";
-
-                    setResultNotification(
-                        lastTradeId,
-                        tradeTypeDisplay,
-                        market,
-                        wsResponse.buy.buy_price
-                    );
-    
-                    console.log("Trade Successful:", wsResponse);
-                    automation = true;
-
-
-                    updatedAccountBalance = updatedAccountBalance - stake;
+                    updatedAccountBalance -= stake;
                     updateNewAccBalance();
-    
-                    setTimeout(() => {
-                        fetchTradeDetails(ws, lastTradeId);
-                    }, 500);
-
-
+                    setResultNotification(lastTradeId, 'Digit Over', market, wsResponse.buy.buy_price);
+                    setTimeout(() => fetchTradeDetails(ws, lastTradeId), 500);
                 }
-            }
+                break;
 
-
-
-            if (wsResponse.msg_type === "proposal_open_contract") {
+            case "proposal_open_contract":
                 if (wsResponse.proposal_open_contract.contract_id === lastTradeId) {
                     const contract = wsResponse.proposal_open_contract;
-
-                    if (contract.is_sold){
-                        const profit = contract.profit;
-                        const result = profit > 0 ? "Win" : "Loss";
-
-                        // setInfo(contract, profit);
-
-                        updateDetails(contract, profit);
-
-                        stakeChangeForOU(result);
-                        isTradeOpen = false;
-
-
-                        if (currentLossAmount < 0) {
-                            // When Trade Loss
-
-                            timeInterval = 0;
-                            
-                            if(lostCountInRow >= 1){
-                                timeInterval = (getRandomNumber(60, 90) * 1000 );
-                            }
-
-                            setTimer(timeInterval);
-                            setTimeout(() => {
-                                runScriptForTrade();
-                            }, timeInterval);
-
-                        } else {
-                            // When Trade Win
-
-                            localStorage.removeItem("currentLossAmount");
-                            localStorage.removeItem("lossTradeCount");
-
-                            if(currentProfitAmount >= targetProfitPerSession){
-                                timeInterval = (getRandomNumber(300, 600) * 1000 );
-
-                                console.log('timeInterval : ', timeInterval);
-
-                                setTimer(timeInterval);
-                                setTimeout(() => {
-                                    reload();
-                                }, timeInterval);
-                            } else {
-                                runScriptForTrade();
-                                
-                            }
-
-                        }
-
-
+                    if (contract.is_sold) {
+                        updateDetails(contract, contract.profit);
                     } else {
-                        setTimeout(() => {
-                            setTickCountDown(
-                                contract.tick_count,
-                                contract.tick_stream.length
-                            );
-                            fetchTradeDetails(ws, lastTradeId);
-                        }, 1000);
+                        setTimeout(() => fetchTradeDetails(ws, lastTradeId), 1000);
                     }
                 }
-            }
+                break;
 
+            case "tick":
+                recordLastDigit(wsResponse.tick.quote);
+                break;
         }
     }
 }
 
-
-
-// ---------------------------------------------------------------------
-
-const stakeChangeForOU = (status) => {
-    if (status == "Loss") {
-        stake = stake * martingaleMultiplier3;
-    } else if (status == "Win") {
-        stake = initialAmountPerTrade;
-    }
-};
-
-
-function setAccData(accData) {
-    // console.log(accData);
-
-    // Set Initial Account Balance
-    initialAccountBalance = Number(accData.balance);
-    setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
-    localStorage.setItem('initialAccountBalance', initialAccountBalance);
-
-    // if(!localStorage.getItem('initialAccountBalance')){
-    //     localStorage.setItem('initialAccountBalance', initialAccountBalance);
-    // }
-
-    // Set Updated Account Balance
-    updatedAccountBalance = initialAccountBalance;
-    setAccountInfo("updatedAccountBalance", `$ ${updatedAccountBalance}`);
-
-
-    // Set Target Profit Amount Per Trade
-    targetProfitPerSession = (initialAccountBalance * (targetProfitPercentagePerSession / 100)).toFixed(2);
-    setAccountInfo("targetProfitPerSession", `$ ${targetProfitPerSession}`);
-    localStorage.setItem('targetProfitPerSession', targetProfitPerSession);
-
-    // Set Target Profit Amount Per Trade
-    initialAmountPerTrade = (initialAccountBalance * (amountPercentagePerTrade / 100)).toFixed(2);
-    setAccountInfo("initialAmountPerTrade", `$ ${initialAmountPerTrade}`);
-    localStorage.setItem('initialAmountPerTrade', initialAmountPerTrade);
-
-
-    stake = initialAmountPerTrade;
+// ====== SUBSCRIBE TICKS ====== //
+function subscribeTicks(symbol) {
+    ws.send(JSON.stringify({ ticks: symbol }));
 }
 
-
-function updateDetails(contract, lastTradeProfit) {
-
-    // console.log(contract);
-    // console.log(lastTradeProfit);
-
-    // If Trade Win
-    if(lastTradeProfit > 0){
-        winTradeCount = winTradeCount + 1;
-        lostCountInRow = 0;
-        totalProfitAmount = totalProfitAmount + lastTradeProfit;
+// ====== MARTINGALE ====== //
+function stakeChangeOU(status) {
+    if (status === "Loss") {
+        sequenceLossAmount += stake;
+        if ((sequenceLossAmount / updatedAccountBalance) * 100 >= maxSequenceLossPercent) {
+            console.log("⚠️ Max sequence loss reached. Stopping bot.");
+            isRunning = false;
+            return;
+        }
+        if (martingaleStep >= maxMartingaleSteps) {
+            stake = initialAmountPerTrade;
+            martingaleStep = 0;
+        } else {
+            stake *= martingaleMultiplier3;
+            martingaleStep++;
+        }
     } else {
-        lossTradeCount = lossTradeCount + 1;
-        lostCountInRow = lostCountInRow + 1;
-        totalLossAmount = totalLossAmount + lastTradeProfit;
+        sequenceLossAmount = 0;
+        martingaleStep = 0;
+        if(currentProfitAmount < 0){
+            stake = Math.abs(Number(currentProfitAmount)) * 1.6;
+        } else {
+            stake = initialAmountPerTrade;
+        }
+
+        console.log('new stake : ', stake);
+    }
+}
+
+// ====== PROBABILITY FILTER: OVER 2 ====== //
+function shouldTradeOver2() {
+    console.log('recentDigits.length - ', recentDigits.length);
+    console.log('probabilityCheckLength - ', probabilityCheckLength);
+    if (recentDigits.length < probabilityCheckLength) return false;
+    const freq = recentDigits.filter(d => targetDigits.includes(d)).length;
+    const probability = (freq / probabilityCheckLength) * 100;
+    console.log(`📊 Over 2 frequency: ${probability.toFixed(2)}%`);
+    console.log(`maxDigitProbability: ${maxDigitProbability}%`);
+    return probability >= maxDigitProbability;
+}
+
+// ====== RECORD DIGITS ====== //
+function recordLastDigit(quote) {
+    const digit = parseInt(quote.toString().slice(-1));
+    recentDigits.push(digit);
+    if (recentDigits.length > probabilityCheckLength) {
+        recentDigits.shift();
+    }
+    updateTickBufferStatus();  // update the countdown display
+}
+
+// ====== TRADE LOOP ====== //
+function runScriptForTrade() {
+    if (!isRunning) return;
+
+    console.log('currentProfitAmount - ', currentProfitAmount);
+    console.log('targetProfitPerSession - ', targetProfitPerSession);
+
+    if (currentProfitAmount >= targetProfitPerSession) {
+        console.log("✅ Session target reached.");
+
+        let timeInterval = (getRandomNumber(10, 60) * 1000);
+        setTimer(timeInterval);
+        setTimeout(() => {
+            systemRestart();
+        }, timeInterval);
+        // return;
     }
 
-    currentProfitAmount = currentProfitAmount + lastTradeProfit;
-    currentLossAmount = currentLossAmount + lastTradeProfit;
-    if(currentLossAmount >= 0){currentLossAmount = 0;}
+    if (!shouldTradeOver2()) {
+        setTimeout(runScriptForTrade, 2000);
+        return;
+    }
 
+    console.log("🎯 Placing Over 2 trade...");
+    placeOUTrade(market);
+}
+
+// ====== ACCOUNT SETUP ====== //
+function setAccData(accData) {
+    initialAccountBalance = Number(accData.balance);
+    updatedAccountBalance = initialAccountBalance;
+
+    targetProfitPerSession = Number((initialAccountBalance * (targetProfitPercentagePerSession / 100)).toFixed(2));
+    initialAmountPerTrade = Number((initialAccountBalance * (amountPercentagePerTrade / 100)).toFixed(2));
+    stake = initialAmountPerTrade;
+
+    setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance}`);
+    setAccountInfo("updatedAccountBalance", `$ ${updatedAccountBalance}`);
+    setAccountInfo("targetProfitPerSession", `$ ${targetProfitPerSession}`);
+    setAccountInfo("initialAmountPerTrade", `$ ${initialAmountPerTrade}`);
+
+    localStorage.setItem('initialAccountBalance', initialAccountBalance);
+    localStorage.setItem('targetProfitPerSession', targetProfitPerSession);
+    localStorage.setItem('initialAmountPerTrade', initialAmountPerTrade);
+}
+
+// ====== AFTER CONTRACT CLOSE ====== //
+function updateDetails(contract, profit) {
+    if (profit > 0) {
+        winTradeCount++;
+        stakeChangeOU("Win");
+    } else {
+        maxDigitProbability = 80;
+        lossTradeCount++;
+        stakeChangeOU("Loss");
+    }
+
+    currentProfitAmount += profit;
     updatedAccountBalance = initialAccountBalance + currentProfitAmount;
-
-    netProfit = updatedAccountBalance - initialAccountBalance;
     updateNewAccBalance();
 
+    setResultNotification(lastTradeId, 'Digit Over', market, contract.buy_price, profit);
 
-    // console.log('-------------------------------------');
-    // console.log('updatedAccountBalance : ', updatedAccountBalance);
-    // console.log('netProfit : ', netProfit);
-    // console.log('-------------------------------------');
-
-    setResultNotification(
-        lastTradeId,
-        tradeType,
-        market,
-        contract.buy_price,
-        lastTradeProfit
-    );
 
     setAccountInfo("totalTradeCount", `${totalTradeCount}`);
     setAccountInfo("winCount", `${winTradeCount}`);
@@ -326,6 +254,8 @@ function updateDetails(contract, lastTradeProfit) {
     }
     setAccountInfo("updatedAccountBalance", `${updatedAccountBalanceDisplay}`);
 
+    netProfit = updatedAccountBalance - initialAccountBalance;
+
 
     let netProfitDisplay = null;
     if (netProfit > 0) {
@@ -334,7 +264,7 @@ function updateDetails(contract, lastTradeProfit) {
         netProfitDisplay = `<span class="red">$ ${netProfit.toFixed(2)}</span>`;
     }
     setAccountInfo("net_profit", `${netProfitDisplay}`);
-  
+
 
     let currentProfitAmountDisplay = null;
     if (currentProfitAmount < 0) {
@@ -359,10 +289,25 @@ function updateDetails(contract, lastTradeProfit) {
     setAccountInfo("currentLossAmount", `${currentLossAmountDisplay}`);
 
 
-    
+    setFlashNotification('',1);
+
+
+    if (profit < 0) {
+        timeInterval = (getRandomNumber(50, 80) * 1000 );
+        setTimer(timeInterval);
+        setTimeout(runScriptForTrade, timeInterval);
+    } else {
+        runScriptForTrade();
+    }
 }
 
-function runScriptForTrade() {
-    isRunning = true;
-    placeOUTrade(market);
+function updateTickBufferStatus() {
+    setFlashNotification(`Collecting ticks: ${recentDigits.length} / ${probabilityCheckLength}`, 0);
+    if (recentDigits.length >= probabilityCheckLength) {
+        setFlashNotification(" ✅ Ready to trade!", 0);
+    }
+}
+
+function systemRestart() {
+    location.reload();
 }
