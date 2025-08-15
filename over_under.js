@@ -14,7 +14,10 @@ const maxSequenceLossPercent = 5;             // Stop if loss > 5% of account in
 const probabilityCheckLength = 10;            // Ticks to check for digit frequency
 
 // For "Over 2" trades
-const targetDigits = [3, 4, 5, 6, 7, 8, 9];
+const targetDigitsOver2 = [3, 4, 5, 6, 7, 8, 9];
+
+// For "Under 7" trades
+const targetDigitsUnder7 = [0, 1, 2, 3, 4, 5, 6];
 
 // ====== NEW LOSS CONTROL VARIABLES ====== //
 let consecutiveLosses = 0;
@@ -28,6 +31,10 @@ let dailyStopTriggered = false;   // Flag to block trades for the rest of the da
 
 let tradeInProgress = false;     // Prevents multiple simultaneous trades
 let lastStakeAmount = null;      // Stores last used stake for comparison
+
+let proposalId = null;
+let tickSubscriptionId = null;
+
 
 
 // ====== RUNTIME VARIABLES ====== //
@@ -84,12 +91,22 @@ function startWebSocket() {
         const wsResponse = JSON.parse(event.data);
         if (!wsResponse) return;
 
+        console.log(wsResponse);
+
+        // Store subscription ID when we first get it
+        if (wsResponse.msg_type === "tick" && wsResponse.subscription && !tickSubscriptionId) {
+            tickSubscriptionId = wsResponse.subscription.id;
+            console.log("✅ Tick subscription started:", tickSubscriptionId);
+        }
+        
+
         switch (wsResponse.msg_type) {
             case "authorize":
                 console.log("Authorization successful.");
                 setFlashNotification("Authorization successful", 0);
                 if (wsResponse?.authorize?.balance !== undefined) {
                     setAccData(wsResponse.authorize);
+                    market = getRandomMarket(marketArray, '');
                     subscribeTicks(market);
                     // Don't start trading immediately, wait until tick buffer is ready
                 }
@@ -116,7 +133,7 @@ function startWebSocket() {
                     lastTradeId = wsResponse.buy.contract_id;
                     updatedAccountBalance -= stake;
                     updateNewAccBalance();
-                    setResultNotification(lastTradeId, 'Digit Over', market, wsResponse.buy.buy_price);
+                    setResultNotification(lastTradeId, tradeType, market, wsResponse.buy.buy_price);
                     setTimeout(() => fetchTradeDetails(ws, lastTradeId), 500);
                 }
                 break;
@@ -143,6 +160,17 @@ function startWebSocket() {
 function subscribeTicks(symbol) {
     ws.send(JSON.stringify({ ticks: symbol }));
 }
+
+function unsubscribeTicks() {
+    if (tickSubscriptionId) {
+        ws.send(JSON.stringify({ forget: tickSubscriptionId }));
+        console.log("🛑 Tick subscription cancelled:", tickSubscriptionId);
+        tickSubscriptionId = null;
+    } else {
+        console.log("⚠️ No active tick subscription to cancel.");
+    }
+}
+
 
 // ====== SAFE RECOVERY CALCULATION ====== //
 function calculateSafeRecoveryStake() {
@@ -220,14 +248,34 @@ function stakeChangeOU(status) {
 
 // ====== PROBABILITY FILTER: OVER 2 ====== //
 function shouldTradeOver2() {
-    console.log('recentDigits : ', recentDigits);
-
-    if (recentDigits.length < probabilityCheckLength) return false;
-    const freq = recentDigits.filter(d => targetDigits.includes(d)).length;
-    const probability = (freq / probabilityCheckLength) * 100;
-    console.log(`📊 Over 2 frequency: ${probability.toFixed(2)}%`);
-    return probability >= maxDigitProbability;
+    if (recentDigits.length < probabilityCheckLength) return 0;
+    const freq = recentDigits.filter(d => targetDigitsOver2.includes(d)).length;
+    return (freq / probabilityCheckLength) * 100;
 }
+
+function shouldTradeUnder7() {
+    if (recentDigits.length < probabilityCheckLength) return 0;
+    const freq = recentDigits.filter(d => targetDigitsUnder7.includes(d)).length;
+    return (freq / probabilityCheckLength) * 100;
+}
+
+
+function decideBestTrade() {
+    const probOver2 = shouldTradeOver2();
+    const probUnder7 = shouldTradeUnder7();
+
+    console.log(`📊 Over 2 probability: ${probOver2.toFixed(2)}%`);
+    console.log(`📊 Under 7 probability: ${probUnder7.toFixed(2)}%`);
+
+    if (probOver2 >= maxDigitProbability && probOver2 > probUnder7) {
+        return "OVER_2";
+    } 
+    if (probUnder7 >= maxDigitProbability && probUnder7 > probOver2) {
+        return "UNDER_7";
+    }
+    return null; // No trade
+}
+
 
 // ====== RECORD DIGITS ====== //
 function recordLastDigit(quote) {
@@ -246,6 +294,7 @@ function runScriptForTrade() {
     // Prevent placing new trade if another trade is in progress
     if (tradeInProgress) {
         console.log("⏳ Waiting for current trade to finish...");
+        setTimeout(() => fetchTradeDetails(ws, lastTradeId), 1000);
         setTimeout(runScriptForTrade, 2000);
         return;
     }
@@ -256,6 +305,8 @@ function runScriptForTrade() {
         setTimeout(runScriptForTrade, 2000);
         return;
     }
+    console.log('recentDigits : ', recentDigits);
+
 
     if (currentProfitAmount >= targetProfitPerSession) {
         console.log("✅ Session target reached.");
@@ -263,15 +314,27 @@ function runScriptForTrade() {
         setTimer(timeInterval);
         setTimeout(systemRestart, timeInterval);
         return;
-    } else if (!shouldTradeOver2()) {
-        setTimeout(runScriptForTrade, 2000);
-        return;
+    } else {
+        const decision = decideBestTrade();
+        if (!decision) {
+            setTimeout(runScriptForTrade, 2000);
+            return;
+        }
+
+        if (decision === "OVER_2") {
+            console.log("🎯 Placing Over 2 trade...");
+            lastStakeAmount = stake;
+            unsubscribeTicks();
+            placeOverUnderTrade(market, "OVER_2");
+        } 
+        else if (decision === "UNDER_7") {
+            console.log("🎯 Placing Under 7 trade...");
+            lastStakeAmount = stake;
+            unsubscribeTicks();
+            placeOverUnderTrade(market, "UNDER_7");
+        }
     }
 
-    console.log("🎯 Placing Over 2 trade...");
-    tradeInProgress = true; // Mark trade as active
-    lastStakeAmount = stake; // Save stake before placing trade
-    placeOUTrade(market);
 }
 
 // ====== ACCOUNT SETUP ====== //
@@ -317,7 +380,7 @@ function updateDetails(contract, profit) {
     updatedAccountBalance = initialAccountBalance + currentProfitAmount;
     updateNewAccBalance();
 
-    setResultNotification(lastTradeId, 'Digit Over', market, contract.buy_price, profit);
+    setResultNotification(lastTradeId, tradeType, market, contract.buy_price, profit);
 
     setAccountInfo("totalTradeCount", `${totalTradeCount}`);
     setAccountInfo("winCount", `${winTradeCount}`);
@@ -372,8 +435,13 @@ function updateDetails(contract, profit) {
     if (profit < 0) {
         timeInterval = (getRandomNumber(50, 70) * 1000);
         setTimer(timeInterval);
-        setTimeout(runScriptForTrade, timeInterval);
+        setTimeout(() => {
+            runScriptForTrade();
+            subscribeTicks(market);
+
+        }, timeInterval);
     } else {
+        subscribeTicks(market);
         runScriptForTrade();
     }
     tradeInProgress = false; // Allow next trade

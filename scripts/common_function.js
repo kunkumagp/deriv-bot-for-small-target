@@ -211,6 +211,43 @@ function placeTrade(prediction = null, duration = null , tradeingType = null) {
 }
 
 
+function placeOverUnderTrade(market, type) {
+    if (tradeInProgress) return; // HARD lock to prevent multiple trades
+    tradeInProgress = true;
+    let tradeBarrier;
+
+    if (type === "OVER_2") {
+        tradeState = "DIGITOVER";
+        tradeType = "Digit Over";
+        tradeBarrier = 2;
+    } else if (type === "UNDER_7") {
+        tradeState = "DIGITUNDER";
+        tradeType = "Digit Under";
+        tradeBarrier = 7;
+    }
+
+    stake = Number(stake);
+    stake < 0.35 ? (stake = 0.35) : (stake = stake);
+
+
+    const tradeDetails = {
+        proposal: 1,
+        amount: stake.toFixed(2),
+        basis: "stake",
+        currency: "USD",
+        duration: 1,
+        contract_type: tradeState,
+        duration_unit: "t",
+        symbol: market,
+        barrier: tradeBarrier
+    };
+
+
+    tradesOn = true;
+    onTradeCount = 1;
+    console.log("Sending trade request with details:", tradeDetails);
+    ws.send(JSON.stringify(tradeDetails));
+}
 
 function placeOUTrade(market) {
     console.log(market);
@@ -219,7 +256,7 @@ function placeOUTrade(market) {
         let tradeRequest;
 
         tradeState = "DIGITOVER";
-        tradeType = "over";
+        tradeType = "Digit Over";
         stake = Number(stake);
         stake < 0.35 ? (stake = 0.35) : (stake = stake);
 
@@ -233,6 +270,38 @@ function placeOUTrade(market) {
             duration_unit: 't',
             symbol: market,
             barrier: 2
+            };
+
+
+        tradesOn = true;
+
+        onTradeCount = 1;
+        console.log("Sending trade request with prediction:", tradeRequest);
+        ws.send(JSON.stringify(tradeRequest));
+    }
+}
+
+function placeUnderTrade(market) {
+    console.log(market);
+    if (isTradeOpen == false) {
+        let tradeState;
+        let tradeRequest;
+
+        tradeState = "DIGITUNDER";
+        tradeType = "Digit Under";
+        stake = Number(stake);
+        stake < 0.35 ? (stake = 0.35) : (stake = stake);
+
+        tradeRequest = {
+            proposal: 1,
+            amount: stake.toFixed(2),
+            basis: 'stake',
+            contract_type: tradeState,
+            currency: 'USD',
+            duration: 1,
+            duration_unit: 't',
+            symbol: market,
+            barrier: 7
             };
 
 
