@@ -212,6 +212,8 @@ function placeTrade(prediction = null, duration = null , tradeingType = null) {
 
 
 function placeOverUnderTrade(market, type) {
+    console.log('Trade In Progress:', tradeInProgress);
+
     if (tradeInProgress) return; // HARD lock to prevent multiple trades
     tradeInProgress = true;
     let tradeBarrier;
@@ -241,7 +243,10 @@ function placeOverUnderTrade(market, type) {
         symbol: market,
         barrier: tradeBarrier
     };
+    console.log('Trade Details:', tradeDetails);
+    tradeInProgress = true;
 
+    unsubscribeTicks();
 
     tradesOn = true;
     onTradeCount = 1;
@@ -849,4 +854,18 @@ function updateNewAccBalance() {
     }
 
     setAccountInfo("updatedAccountBalance", `${updatedAccountBalanceDisplay}`);
+}
+
+function unsubscribeTicks() {
+    if (tickSubscriptionId) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ forget: tickSubscriptionId }));
+            console.log("🛑 Tick subscription cancelled:", tickSubscriptionId);
+        } else {
+            console.log("⚠️ WebSocket is not open. Cannot unsubscribe.");
+        }
+        tickSubscriptionId = null;
+    } else {
+        console.log("⚠️ No active tick subscription to cancel.");
+    }
 }
