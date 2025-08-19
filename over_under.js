@@ -197,7 +197,7 @@ function startWebSocket(){
                             localStorage.removeItem("lossTradeCount");
 
                             if(currentProfitAmount >= targetProfitPerSession){
-                                timeInterval = (getRandomNumber(300, 600) * 1000 );
+                                timeInterval = (getRandomNumber(120, 180) * 1000 );
 
                                 console.log('timeInterval : ', timeInterval);
 
