@@ -1,0 +1,40 @@
+body {
+    font-family: Arial, sans-serif;
+    background: #f4f4f4;
+    margin: 0;
+    padding: 20px;
+}
+#controls {
+    margin-bottom: 20px;
+}
+#accountDetails {
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+#summary {
+    margin-bottom: 20px;
+}
+#tradeDetails {
+    margin-bottom: 20px;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+th, td {
+    border: 1px solid #ccc;
+    padding: 8px;
+    text-align: center;
+}
+#logPanel {
+    background: #222;
+    color: #eee;
+    padding: 10px;
+    border-radius: 5px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+#logs {
+    font-size: 14px;
+    white-space: pre-wrap;
+}

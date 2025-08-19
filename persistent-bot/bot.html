@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Persistent Trading Bot</title>
+    <link rel="stylesheet" href="bot.css">
+</head>
+<body>
+    <div id="controls">
+        <select id="accountSelect"></select>
+        <button id="startBtn">Start Bot</button>
+        <button id="stopBtn">Stop Bot</button>
+    </div>
+    <div id="accountDetails"></div>
+    <div id="summary">
+        <h3>Profit/Loss Summary</h3>
+        <div id="totalPL"></div>
+    </div>
+    <div id="tradeDetails">
+        <h3>Trade Details</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Trade ID</th>
+                    <th>Market</th>
+                    <th>Type</th>
+                    <th>Stake</th>
+                    <th>Result</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody id="tradesTable"></tbody>
+        </table>
+    </div>
+    <div id="logPanel">
+        <h3>Logs</h3>
+        <button id="exportLogsBtn">Export Logs to Excel</button>
+        <button id="clearLogsBtn">Clear Logs</button>
+        <pre id="logs"></pre>
+    </div>
+    <script src="bot.js"></script>
+</body>
+</html>
