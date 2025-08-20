@@ -8,7 +8,7 @@ let ws, apiToken, intervalId;
 let isRunning = false;
 
 let targetProfitPercentagePerSession = 1,
-amountPercentagePerTrade = 0.1,
+amountPercentagePerTrade = 0.35,
 initialAmountPerTrade,
 targetProfitPerSession;
 
