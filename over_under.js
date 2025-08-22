@@ -1,4 +1,5 @@
 const accountSelectElement = document.getElementById("account_select");
+let pingIntervalId;
 const marketSelectElement = document.getElementById("market");
 
 const resetBotButton = document.getElementById("resetBot");
@@ -46,26 +47,47 @@ resetBotButton.addEventListener('click', resetBot);
 
 startWebSocket();
 
+
+function startPing(ws) {
+    // Send a ping every 30 seconds
+    pingIntervalId = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ ping: 1 }));
+        }
+    }, 30000);
+}
+
+function stopPing() {
+    if (pingIntervalId) {
+        clearInterval(pingIntervalId);
+        pingIntervalId = null;
+    }
+}
+
 function startWebSocket(){
     ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
-    
+
     ws.onopen = function () {
         console.log("Connection open");
         console.log(apiToken);
-
         getAuthentication(ws, apiToken);
+        startPing(ws); // Start pinging to keep connection alive
     };
 
     ws.onclose = function () {
         console.log("Connection closed");
         console.log("-----------------------------\n");
+        stopPing(); // Stop pinging when connection closes
         // tradesOn = false;
+
+        setTimeout(() => {
+            startWebSocket();
+        }, 50000);
     };
 
     ws.onerror = function (err) {
         console.error("WebSocket error:", err);
     };
-
 
     ws.onmessage = function (event) {
         wsResponse = JSON.parse(event.data);
@@ -73,40 +95,18 @@ function startWebSocket(){
         if (wsResponse != null) {
             console.log('wsResponse : ',wsResponse);
 
-
             if (wsResponse.msg_type === "authorize") {
-
                 console.log("Authorization successful.\n-----------------------------\n\n");
                 setFlashNotification("Authorization successful", 0);
 
-
                 if (wsResponse?.authorize?.balance !== undefined && wsResponse.authorize.balance !== null) {
-
                     // Set Account Details and trading Data
                     setAccData(wsResponse.authorize);
                     let targetProfitPerSession = localStorage.getItem('targetProfitPerSession');
-
-                    // if (targetProfitPerSession > 0 && sessionProfit >= targetProfitPerSession) {
-                    //     logMessage = 'Session target is completed.';
-                    //     setFlashNotification(logMessage, 0);
-                    //     console.log(logMessage);
-                    // } else {
-                    //     // setFlashNotification("Start Trading", 0);
-                    //     // console.log("Start Trading");
-                    //     logMessage = 'Start Trading';
-                    //     console.log(logMessage);
-                    //     setFlashNotification(logMessage, 0);
-                    //     runScriptForTrade();
-                    // }
                     runScriptForTrade();
-
-
-
                 } else if (wsResponse?.error?.code !== undefined && wsResponse.error.code === "WrongResponse") {
                     reload();
                 }
-
-
             }
 
             if (wsResponse.msg_type === "proposal") {
@@ -130,12 +130,10 @@ function startWebSocket(){
                 ) {
                     // placeTrade();
                 } else {
-
                     lastTradeId = wsResponse.buy.contract_id;
                     totalTradeCount = totalTradeCount + 1;
                     isTradeOpen = true;
                     tradeTypeDisplay = "Digit Over";
-
                     setResultNotification(
                         lastTradeId,
                         tradeTypeDisplay,
@@ -145,20 +143,14 @@ function startWebSocket(){
     
                     console.log("Trade Successful:", wsResponse);
                     automation = true;
-
-
                     updatedAccountBalance = updatedAccountBalance - stake;
                     updateNewAccBalance();
     
                     setTimeout(() => {
                         fetchTradeDetails(ws, lastTradeId);
                     }, 500);
-
-
                 }
             }
-
-
 
             if (wsResponse.msg_type === "proposal_open_contract") {
                 if (wsResponse.proposal_open_contract.contract_id === lastTradeId) {
@@ -167,52 +159,42 @@ function startWebSocket(){
                     if (contract.is_sold){
                         const profit = contract.profit;
                         const result = profit > 0 ? "Win" : "Loss";
-
-                        // setInfo(contract, profit);
-
                         updateDetails(contract, profit);
-
                         stakeChangeForOU(result);
                         isTradeOpen = false;
 
-
                         if (currentLossAmount < 0) {
                             // When Trade Loss
-
                             timeInterval = 0;
-                            
-                            if(lostCountInRow >= 1){
+                            if(lostCountInRow >= 3){
+                                localStorage.setItem("totalLostAmount",currentLossAmount );
+                                timeInterval = (getRandomNumber(150, 200) * 1000 );
+                                setTimer(timeInterval);
+                                setTimeout(() => {
+                                    reload();
+                                }, timeInterval);
+                            } else if(lostCountInRow >= 1){
                                 timeInterval = (getRandomNumber(60, 90) * 1000 );
+                                setTimer(timeInterval);
+                                setTimeout(() => {
+                                    runScriptForTrade();
+                                }, timeInterval);
                             }
-
-                            setTimer(timeInterval);
-                            setTimeout(() => {
-                                runScriptForTrade();
-                            }, timeInterval);
-
                         } else {
                             // When Trade Win
-
                             localStorage.removeItem("currentLossAmount");
                             localStorage.removeItem("lossTradeCount");
-
                             if(currentProfitAmount >= targetProfitPerSession){
                                 timeInterval = (getRandomNumber(120, 180) * 1000 );
-
                                 console.log('timeInterval : ', timeInterval);
-
                                 setTimer(timeInterval);
                                 setTimeout(() => {
                                     reload();
                                 }, timeInterval);
                             } else {
                                 runScriptForTrade();
-                                
                             }
-
                         }
-
-
                     } else {
                         setTimeout(() => {
                             setTickCountDown(
@@ -224,7 +206,6 @@ function startWebSocket(){
                     }
                 }
             }
-
         }
     }
 }
@@ -270,7 +251,18 @@ function setAccData(accData) {
     localStorage.setItem('initialAmountPerTrade', initialAmountPerTrade);
 
 
+
     stake = initialAmountPerTrade;
+
+    // Recover lost amount after reload if present in localStorage
+    const totalLostAmount = Number(localStorage.getItem('totalLostAmount'));
+    if (!isNaN(totalLostAmount) && totalLostAmount < 0) {
+        // Calculate stake to recover lost amount using martingale multiplier
+        stake = Math.abs(totalLostAmount) * martingaleMultiplier3;
+        // Optionally, clear the lost amount after setting stake
+        localStorage.removeItem('totalLostAmount');
+        console.log('Recovered lost amount after reload. New stake:', stake);
+    }
 }
 
 
