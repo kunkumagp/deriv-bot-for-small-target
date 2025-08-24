@@ -164,14 +164,16 @@ function startWebSocket(){
                         isTradeOpen = false;
 
                         if (currentLossAmount < 0) {
+                            localStorage.setItem("totalLostAmount",currentLossAmount );
+
+
                             // When Trade Loss
                             timeInterval = 0;
                             if(lostCountInRow >= 3){
-                                localStorage.setItem("totalLostAmount",currentLossAmount );
                                 timeInterval = (getRandomNumber(150, 200) * 1000 );
                                 setTimer(timeInterval);
                                 setTimeout(() => {
-                                    reload();
+                                    runScriptForTrade();
                                 }, timeInterval);
                             } else if(lostCountInRow >= 1){
                                 timeInterval = (getRandomNumber(60, 90) * 1000 );
@@ -184,6 +186,8 @@ function startWebSocket(){
                             // When Trade Win
                             localStorage.removeItem("currentLossAmount");
                             localStorage.removeItem("lossTradeCount");
+                            localStorage.removeItem('totalLostAmount');
+
                             if(currentProfitAmount >= targetProfitPerSession){
                                 timeInterval = (getRandomNumber(120, 180) * 1000 );
                                 console.log('timeInterval : ', timeInterval);
