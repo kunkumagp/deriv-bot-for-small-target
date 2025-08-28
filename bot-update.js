@@ -1,5 +1,6 @@
 let ws, apiToken, intervalId;
 let isRunning2 = false;
+let pingIntervalId;
 
 const accountSelectElement = document.getElementById("account_select");
 const marketSelectElement = document.getElementById("market");
@@ -23,7 +24,7 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option);
 });
 
-accountSelectElement.value = "YbaIy3dD51g2eoO";
+accountSelectElement.value = "lkUxtOopvUhCpIX";
 marketSelectElement.value = "R_100";
 apiToken = accountSelectElement.value;
 
@@ -33,7 +34,7 @@ accountSelectElement.addEventListener("change", () => {
 
 market = getRandomMarket(marketArray, '');
 
-// botStart();
+botStart();
 
 
 startBotButton.addEventListener('click', botStart);
@@ -76,12 +77,20 @@ function startWebSocket() {
     ws.onopen = function () {
         console.log("Connection open");
         getAuthentication(ws, apiToken);
+        startPing(); // Start pinging to keep connection alive
+        console.log("-----------------------------\n");
     };
 
     ws.onclose = function () {
         console.log("Connection closed");
         console.log("-----------------------------\n");
         // tradesOn = false;
+        stopPing(); // Stop pinging when connection closes
+        // tradesOn = false;
+
+        setTimeout(() => {
+            startWebSocket();
+        }, 1000);
     };
 
     ws.onerror = function (err) {
@@ -224,7 +233,7 @@ function startWebSocket() {
                             localStorage.setItem("lossTradeCount", lossTradeCount);
 
                             // let newTime = (getRandomNumber(10, 15) * 60000 );
-                            let newTime = (getRandomNumber(1, 5) * 1000 );
+                            let newTime = (getRandomNumber(60, 180) * 1000 );
                             setTimer(newTime);
                             setTimeout(() => {
                                 runPrediction();
@@ -264,5 +273,22 @@ function startWebSocket() {
 
         }
     };
+
+    function startPing() {
+    // Send a ping every 30 seconds
+    pingIntervalId = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ ping: 1 }));
+        }
+    }, 30000);
+}
+
+    function stopPing() {
+        if (pingIntervalId) {
+            clearInterval(pingIntervalId);
+            pingIntervalId = null;
+        }
+    }
+
 
 }
