@@ -26,7 +26,7 @@ let initialAccountBalance = 0,
 
 const now = new Date();
 
-const martingaleMultiplier1 = 2.07112,
+const martingaleMultiplier1 = 2.8,
     martingaleMultiplier2 = 1.3,
     martingaleMultiplier3 = 3.5;
 
@@ -553,7 +553,7 @@ function setResultNotification(
             console.log("Parent element not found.");
         }
     } else {
-        console.log('marketObj : ', marketObj);
+        // console.log('marketObj : ', marketObj);
         $(".result-notification").prepend(`<span class="stake-info" id="${contractId}"><span class="detailt"><span>Contract ID : </span><span class="contract-info">${contractId}</span></span><span class="detailt"><span>Market : </span><span class="contract-info">${marketObj.name}</span></span><span class="detailt"><span>Type : </span><span class="contract-info">${tradeTypeDisplay}</span></span><span class="detailt"><span>Stake : </span><span class="contract-info">${stake}</span></span><span class="detailt"><span>Profit / Loss Amount : </span><span class="contract-info" id="${contractId}-profit"><span class="">-</span></span></span><span class="detailt"><span>Status : </span><span class="contract-info" id="${contractId}-status"><span class="">-</span></span></span></span>`);
     }
 }
