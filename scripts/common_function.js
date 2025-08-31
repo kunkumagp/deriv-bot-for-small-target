@@ -221,7 +221,7 @@ function placeOUTrade(market) {
     if (isTradeOpen == false) {
         let tradeState;
         let tradeRequest;
-        let barrierNumber = 1;
+        let barrierNumber = 3;
 
         tradeState = "DIGITOVER";
         tradeType = "over";
