@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Deriv Even/Odd Backtester with Martingale</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h2 { margin-top: 30px; }
+    #results { margin-top: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th { background: #f4f4f4; }
+    input { width: 60px; margin-right: 10px; }
+    button { margin: 5px; padding: 5px 10px; }
+  </style>
+</head>
+<body>
+  <h1>Deriv Even/Odd Backtester with Martingale</h1>
+
+  <div>
+    <label>Starting Balance: $<input type="number" id="startingBalance" value="100" step="0.01"></label>
+    <label>Stake: $<input type="number" id="stake" value="1" step="0.01"></label>
+    <label>Lookback: <input type="number" id="lookback" value="10"></label>
+    <label>Threshold: <input type="number" id="threshold" value="7"></label>
+    <label>Daily Target %: <input type="number" id="dailyTargetPct" value="5"></label>
+    <label>Daily Stop %: <input type="number" id="dailyStopPct" value="10"></label>
+    <label>Martingale: <input type="checkbox" id="martingaleToggle" checked></label>
+  </div>
+
+  <div>
+    <label>Start Index: <input type="number" id="startIndex" value="0"></label>
+    <label>End Index: <input type="number" id="endIndex" value="1000"></label>
+  </div>
+
+  <div>
+    <button onclick="fetchTicks()">Fetch Ticks</button>
+    <button onclick="runBacktest()">Run Backtest</button>
+  </div>
+
+  <div id="results"></div>
+  <canvas id="balanceChart" width="800" height="400"></canvas>
+
+  <script>
+    let ticks = [];
+
+    async function fetchTicks() {
+      try {
+        // Replace with actual Deriv WebSocket/API logic
+        // Generating synthetic ticks for demonstration
+        ticks = Array.from({ length: 2000 }, () => Math.random() * 1000);
+        alert("Fetched " + ticks.length + " ticks.");
+      } catch (err) {
+        console.error(err);
+        alert("Failed to fetch ticks: " + err.message);
+      }
+    }
+
+    function runBacktest() {
+      if (ticks.length === 0) {
+        alert("No ticks available for backtesting.");
+        return;
+      }
+
+      const startingBalance = parseFloat(document.getElementById("startingBalance").value);
+      const baseStake = parseFloat(document.getElementById("stake").value);
+      const lookback = parseInt(document.getElementById("lookback").value);
+      const threshold = parseInt(document.getElementById("threshold").value);
+      const dailyTargetPct = parseFloat(document.getElementById("dailyTargetPct").value) / 100;
+      const dailyStopPct = parseFloat(document.getElementById("dailyStopPct").value) / 100;
+      const useMartingale = document.getElementById("martingaleToggle").checked;
+      const startIndex = parseInt(document.getElementById("startIndex").value);
+      const endIndex = parseInt(document.getElementById("endIndex").value);
+
+      let balance = startingBalance;
+      let currentDayProfit = 0;
+      let trades = [];
+      let balanceHistory = [balance];
+      let stake = baseStake;
+
+      for (let i = Math.max(lookback, startIndex); i < Math.min(ticks.length, endIndex); i++) {
+        const lastDigits = ticks.slice(i - lookback, i).map(p => {
+          const str = p.toFixed(2).replace(".", "");
+          return parseInt(str.slice(-1));
+        });
+
+        const evens = lastDigits.filter(d => d % 2 === 0).length;
+        let signal = null;
+
+        if (evens >= threshold) signal = "Odd";
+        else if ((lookback - evens) >= threshold) signal = "Even";
+
+        if (signal) {
+          const nextDigit = parseInt(ticks[i].toFixed(2).replace(".", "").slice(-1));
+          const win = (signal === "Even" && nextDigit % 2 === 0) ||
+                      (signal === "Odd" && nextDigit % 2 === 1);
+
+          if (win) {
+            balance += stake;
+            currentDayProfit += stake;
+            stake = baseStake; // reset stake after win
+          } else {
+            balance -= stake;
+            currentDayProfit -= stake;
+            if (useMartingale) stake *= 2; // double only after loss
+            else stake = baseStake;
+          }
+
+          trades.push({ tick: i, signal, nextDigit, win, balance, stake });
+          balanceHistory.push(balance);
+
+          if (currentDayProfit >= startingBalance * dailyTargetPct ||
+              Math.abs(currentDayProfit) >= startingBalance * dailyStopPct) {
+            currentDayProfit = 0;
+            stake = baseStake; // reset stake at daily limit
+          }
+        }
+      }
+
+      displayResults(trades, balanceHistory);
+    }
+
+    function displayResults(trades, balanceHistory) {
+      const winCount = trades.filter(t => t.win).length;
+      const winRate = trades.length ? ((winCount / trades.length) * 100).toFixed(2) : 0;
+      const finalBalance = balanceHistory[balanceHistory.length - 1];
+
+      document.getElementById("results").innerHTML = `
+        <h2>Results</h2>
+        <p>Final Balance: <b>$${finalBalance.toFixed(2)}</b></p>
+        <p>Total Trades: <b>${trades.length}</b></p>
+        <p>Win Rate: <b>${winRate}%</b></p>
+
+        <h2>Trade History</h2>
+        <table>
+          <tr><th>#</th><th>Signal</th><th>Next Digit</th><th>Result</th><th>Balance</th><th>Stake</th></tr>
+          ${trades.map((t, i) => `
+            <tr>
+              <td>${i + 1}</td>
+              <td>${t.signal}</td>
+              <td>${t.nextDigit}</td>
+              <td>${t.win ? "Win ✅" : "Loss ❌"}</td>
+              <td>$${t.balance.toFixed(2)}</td>
+              <td>$${t.stake.toFixed(2)}</td>
+            </tr>`).join("")}
+        </table>
+      `;
+
+      const ctx = document.getElementById("balanceChart").getContext("2d");
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: balanceHistory.map((_, i) => i),
+          datasets: [{
+            label: "Balance",
+            data: balanceHistory,
+            borderColor: "blue",
+            fill: false
+          }]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+      });
+    }
+  </script>
+</body>
+</html>

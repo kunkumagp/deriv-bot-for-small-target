@@ -9,14 +9,15 @@ let ws, apiToken, intervalId;
 let isRunning = false,
     tickSubscriptionId = null;
 
-let targetProfitPercentagePerSession = 0.35,
-    amountPercentagePerTrade = 0.35,
+let targetProfitPercentagePerSession = 0.1,
+    amountPercentagePerTrade = 0.1,
     initialAmountPerTrade,
     recentDigits = [],
     tradeInProgress = false,
     lastStakeAmount = null,
     matcherNumber = null,
     lossCountInRow = 0,
+    maxDecimalLength = 0,
     targetProfitPerSession;
 
 const probabilityCheckLength = 10;            // Ticks to check for digit frequency
@@ -85,7 +86,7 @@ function startWebSocket() {
     ws.onmessage = function (event) {
         const wsResponse = JSON.parse(event.data);
         if (!wsResponse) return;
-        console.log('wsResponse : ', wsResponse);
+        // console.log('wsResponse : ', wsResponse);
 
         if(!wsResponse.error){
             // Store subscription ID when we first get it
@@ -97,14 +98,13 @@ function startWebSocket() {
             switch (wsResponse.msg_type) {
                 case "authorize":
                     const logMessage = "Authorization successful.";
-                    console.log(logMessage);
+                    // console.log(logMessage);
                     setFlashNotification(logMessage, 0);
                     if (wsResponse?.authorize?.balance !== undefined) {
                         const balanceMessage = `Your balance is: ${wsResponse.authorize.balance}`;
-                        console.log(balanceMessage);
+                        // console.log(balanceMessage);
                         setFlashNotification(balanceMessage, 0);
                         setAccData(wsResponse.authorize);
-                        // subscribeTicks(market);
                         isRunning = true;
 
                         runScriptForTrade();
@@ -114,19 +114,74 @@ function startWebSocket() {
 
                 case "tick":
                     // Handle tick data
-                    recordLastDigit(wsResponse.tick.quote);
+                    // console.log(wsResponse.tick.quote);
+                    const lastDigit = test(maxDecimalLength, wsResponse.tick.quote);
+                    // test(recentDigits, wsResponse.tick.quote);
+                    // console.log("Last digit from price:", lastDigit);
 
-                    // Start trading automatically when tick buffer is ready
-                    if (!isRunning && recentDigits.length >= probabilityCheckLength) {
-                        isRunning = true;
-                        console.log("✅ Tick buffer ready. Starting trade loop...");
-                        runScriptForTrade();
-                    }
+                    getHistoricalTicks(market, 100, (lastDigits) => {
+                        // Process historical last digits
+                        const lastDigitProbabilities = getLastDigitProbabilities(lastDigits);
+                        // console.log("Probabilities:", lastDigitProbabilities);
+                        const lowestProbabilityNumber = getLowestProbabilityDigits(lastDigitProbabilities);
+                        // console.log("Lowest probability digit(s):", lowestProbabilityNumber);
+
+                        if (lowestProbabilityNumber.length === 1) {
+                            matcherNumber = lowestProbabilityNumber[0];
+
+                            if(lastDigit.lastDigit == matcherNumber){
+                                // console.log("Make the Trade");
+                                
+                                makeTheTrade(ws);
+                                unsubscribeTicks();
+                            }
+                        }
+
+                    });
+
+                    // getHistoricalTicks(market, 100, (lastDigits) => {
+                    //     // console.log("Historical Last Digits:", lastDigits);
+                    //     // recentDigits = lastDigits;
+                    //     console.log("Last digits list:", lastDigits);
+                    //     const lastDigitData = test(lastDigits, lastDigits[lastDigits.length - 1]);
+                    //     console.log("Last digit data:", lastDigitData);
+
+                    //     const lastDigitProbabilities = getLastDigitProbabilities(lastDigits);
+                    //     console.log("Probabilities:", lastDigitProbabilities);
+                    //     const lowestProbabilityNumber = getLowestProbabilityDigits(lastDigitProbabilities);
+                    //     console.log("Lowest probability digit(s):", lowestProbabilityNumber);
+                    //     // console.log('lowestProbabilityNumber.length',lowestProbabilityNumber.length);
+                        
+                    //     if (lowestProbabilityNumber.length === 1) {
+                    //         matcherNumber = lowestProbabilityNumber[0];
+                    //         // console.log("🎯 Placing a Differ trade...");
+                    //         // placeDifferTrade(market, matcherNumber);
+
+                    //         console.log("matcherNumber:", matcherNumber);
+                            
+
+                    //         if(lastDigitData.lastDigit == matcherNumber){
+                    //             console.log("Make the Trade");
+                                
+                    //             makeTheTrade(ws);
+                    //             unsubscribeTicks();
+                    //         }
+                    //     }
+                    // });
+
+
+                    
                     break;
 
                 case "proposal":
                     tradeProposal = wsResponse;
-                    makeTheTrade(ws);
+                        // subscribeTicks(market);
+
+                    if(lossCountInRow > 0) {
+                        subscribeTicks(market);
+                    } else {
+                        makeTheTrade(ws);
+                    }
                     break;
                 
                 case "buy":
@@ -315,26 +370,18 @@ function runScriptForTrade() {
     //     return null;
     // }
 
-    // Example usage:
-    // const tickHistory = [101.23, 101.48, 101.89, 101.67, 101.02, 101.95];
-
-    // const lastDigitProbabilities = getLastDigitProbabilities(recentDigits);
-    // console.log(lastDigitProbabilities);
-    // console.log("Lowest probability digit(s):", getLowestProbabilityDigits(lastDigitProbabilities));
-
-
-
-    console.log(11111);
     
     // Example usage:
     getHistoricalTicks(market, 100, (lastDigits) => {
-        console.log("Historical Last Digits:", lastDigits);
+        // console.log("Historical Last Digits:", lastDigits);
+        recentDigits = lastDigits;
+
 
         const lastDigitProbabilities = getLastDigitProbabilities(lastDigits);
-        console.log("Probabilities:", lastDigitProbabilities);
+        // console.log("Probabilities:", lastDigitProbabilities);
         const lowestProbabilityNumber = getLowestProbabilityDigits(lastDigitProbabilities);
-        console.log("Lowest probability digit(s):", lowestProbabilityNumber);
-        console.log('lowestProbabilityNumber.length',lowestProbabilityNumber.length);
+        // console.log("Lowest probability digit(s):", lowestProbabilityNumber);
+        // console.log('lowestProbabilityNumber.length',lowestProbabilityNumber.length);
         
         if (lowestProbabilityNumber.length === 1) {
             matcherNumber = lowestProbabilityNumber[0];
@@ -349,22 +396,6 @@ function runScriptForTrade() {
     });
 
 
-
-    // const decision = decideBestTrade();
-    // console.log('Decision : ', decision);
-
-
-    // if (decision === "EVEN") {
-    //     console.log("🎯 Placing EVEN trade...");
-    //     placeEvenOddTrade(market, "EVEN");
-    // } else if (decision === "ODD") {
-    //     console.log("🎯 Placing ODD trade...");
-    //     placeEvenOddTrade(market, "ODD");
-    // } else {
-    //     console.log(11111);
-        
-    //     setTimeout(runScriptForTrade, 2000); // wait for more data
-    // }
 }
 
 
@@ -405,6 +436,9 @@ function getHistoricalTicks(symbol, count = 50, callback) {
                     const parts = price.toString().split(".");
                     if (parts[1]) {
                         maxDecimals = Math.max(maxDecimals, parts[1].length);
+                        maxDecimalLength = maxDecimals;
+                        // console.log(`Max decimal length updated: ${maxDecimals}`);
+
                     }
                 });
 
@@ -437,7 +471,7 @@ function changeStake(contract) {
 
     if(contract.status == "won") {
         if (localStorage.getItem('lossRecovery') === 'true') {
-            stake = initialAmountPerTrade;
+            stake = contract.profit;
             localStorage.removeItem('lossRecovery');
         } else {
             stake = contract.buy_price + contract.profit;
@@ -447,13 +481,14 @@ function changeStake(contract) {
         }
         
     } else {
+        // market = getRandomMarket(marketArray, market);
         stake = (contract.buy_price * 11);
             // stake = initialAmountPerTrade;
 
     }
 
-    console.log('stake : ', stake);
-    console.log('initialAmountPerTrade : ', initialAmountPerTrade);
+    // console.log('stake : ', stake);
+    // console.log('initialAmountPerTrade : ', initialAmountPerTrade);
 
 }
 
@@ -478,7 +513,7 @@ function placeDifferTrade(market, matcherNumber) {
     stake = Number(stake);
     stake < 0.35 ? (stake = 0.35) : (stake = stake);
 
-    console.log('stake in placeTrade : ', stake);
+    // console.log('stake in placeTrade : ', stake);
 
     let tickCount = 1;
 
@@ -508,7 +543,7 @@ function placeDifferTrade(market, matcherNumber) {
 
 function updateDetails(contract) {
 
-    console.log('contract = ',contract);
+    // console.log('contract = ',contract);
 
     let timeInterval = 1000;
     currentLossAmount = currentLossAmount + contract.profit;
@@ -529,7 +564,7 @@ function updateDetails(contract) {
         stake = initialAmountPerTrade
 
         localStorage.setItem('lossRecovery', true);
-        timeInterval = getRandomNumber(10000, 20000);
+        timeInterval = getRandomNumber(10, 20) * 1000;
 
     }
 
@@ -545,7 +580,7 @@ function updateDetails(contract) {
     
 
     setResultNotification(lastTradeId, tradeType, market, contract.buy_price, profit);
-    console.log(`[RESULT] Contract ID: ${lastTradeId}, Type: ${tradeType}, Market: ${market}, Stake: ${contract.buy_price}, Profit: ${profit}`);
+    // console.log(`[RESULT] Contract ID: ${lastTradeId}, Type: ${tradeType}, Market: ${market}, Stake: ${contract.buy_price}, Profit: ${profit}`);
     setTimer(1000);
     setTimeout(() => {
         const el = document.getElementById(lastTradeId);
@@ -600,7 +635,6 @@ function updateDetails(contract) {
 
     setFlashNotification('', 1);
 
-    market = getRandomMarket(marketArray, market);
 
     setTimer(timeInterval);
     setTimeout(() => {
@@ -618,3 +652,71 @@ function updateDetails(contract) {
 function systemRestart() {
     location.reload();
 }
+
+
+// ====== GET LAST DIGIT FROM PRICE ====== //
+function getLastDigitFromPrice(history, lastPrice) {
+  if (!history || history.length === 0) {
+    const str = lastPrice.toString();
+    return { normalized: str, lastDigit: parseInt(str.slice(-1)) };
+  }
+
+  // Step 1: Count decimal lengths in history
+  const decimalCounts = history.map(price => (price.toString().split('.')[1] || '').length);
+
+  // Step 2: Find the majority decimal count
+  const countMap = {};
+  decimalCounts.forEach(dc => {
+    countMap[dc] = (countMap[dc] || 0) + 1;
+  });
+  let majorityDecimal = 0;
+  let maxCount = 0;
+  for (const dc in countMap) {
+    if (countMap[dc] > maxCount) {
+      maxCount = countMap[dc];
+      majorityDecimal = parseInt(dc);
+    }
+  }
+
+  // Step 3: Pad lastPrice decimals to match majorityDecimal
+  let [intPart, decPart = ''] = lastPrice.toString().split('.');
+  while (decPart.length < majorityDecimal) {
+    decPart += '0';
+  }
+  // ⚠️ If lastPrice already has more decimals than majorityDecimal, trim it
+  if (decPart.length > majorityDecimal) {
+    decPart = decPart.slice(0, majorityDecimal);
+  }
+
+  const normalizedStr = intPart + (majorityDecimal > 0 ? '.' + decPart : '');
+
+  // Step 4: Get last digit (remove decimal point first)
+  const lastDigit = parseInt((intPart + decPart).slice(-1), 10);
+
+  return { normalized: normalizedStr, lastDigit };
+}
+
+
+function test(maxDecimalLength, lastPrice) {
+
+  // Step 2: Convert lastPrice to string and ensure it has enough decimals
+  let [integerPart, decimalPart] = String(lastPrice).split('.');
+  decimalPart = decimalPart || '';
+  if (decimalPart.length < maxDecimalLength) {
+    decimalPart = decimalPart.padEnd(maxDecimalLength, '0');
+  }
+
+  // Step 3: Combine integer + decimal if needed (not really needed, just for clarity)
+  const normalizedPrice = integerPart + (decimalPart ? '.' + decimalPart : '');
+
+  // Step 4: Last digit is the last number in the decimal part (or 0 if no decimal)
+  const lastDigit = decimalPart.length > 0 ? Number(decimalPart.slice(-1)) : 0;
+
+  return {
+    maxDecimalLength,
+    lastPriceLength: decimalPart.length,
+    normalizedPrice,
+    lastDigit
+  };
+}
+
