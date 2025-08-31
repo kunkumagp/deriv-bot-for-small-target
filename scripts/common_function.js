@@ -26,9 +26,9 @@ let initialAccountBalance = 0,
 
 const now = new Date();
 
-const martingaleMultiplier1 = 2.8,
+let martingaleMultiplier1 = 2.8,
     martingaleMultiplier2 = 1.3,
-    martingaleMultiplier3 = 3.5;
+    martingaleMultiplier3 = 5;
 
 const accounts = [
     { name: "KunkumaGP", value: "lkUxtOopvUhCpIX" },
@@ -46,6 +46,14 @@ const marketArray = [
     { value: "R_50", name: "Volatility 50 Index" },
     { value: "R_75", name: "Volatility 75 Index" },
     { value: "R_100", name: "Volatility 100 Index" },
+    { value: "1HZ10V", name: "Volatility 10 ( 1s ) Index" },
+    { value: "1HZ15V", name: "Volatility 15 ( 1s ) Index" },
+    { value: "1HZ25V", name: "Volatility 25 ( 1s ) Index" },
+    { value: "1HZ30V", name: "Volatility 30 ( 1s ) Index" },
+    { value: "1HZ50V", name: "Volatility 50 ( 1s ) Index" },
+    { value: "1HZ75V", name: "Volatility 75 ( 1s ) Index" },
+    { value: "1HZ90V", name: "Volatility 90 ( 1s ) Index" },
+    { value: "1HZ100V", name: "Volatility 100 ( 1s ) Index" },
 ];
 
 const getAuthentication = (ws, apiToken) => {
@@ -92,9 +100,6 @@ const stakeChange = (status) => {
     } else if (status == "Win") {
         stake = amountPutForTrading;
     }
-    console.log('status : ', status);
-    console.log('stake : ',stake);
-
 };
 
 
@@ -213,10 +218,10 @@ function placeTrade(prediction = null, duration = null , tradeingType = null) {
 
 
 function placeOUTrade(market) {
-    console.log(market);
     if (isTradeOpen == false) {
         let tradeState;
         let tradeRequest;
+        let barrierNumber = 1;
 
         tradeState = "DIGITOVER";
         tradeType = "over";
@@ -232,8 +237,8 @@ function placeOUTrade(market) {
             duration: 1,
             duration_unit: 't',
             symbol: market,
-            barrier: 2
-            };
+            barrier: barrierNumber
+        };
 
 
         tradesOn = true;
@@ -615,8 +620,6 @@ function setInfo(contract, lastTradeProfit) {
         updatedAccountBalanceDisplay = `<span class="red">$ ${updatedAccountBalance.toFixed(2)}</span>`;
     }
 
-    console.log('initialAccountBalance : ', initialAccountBalance);
-    console.log('updatedAccountBalance : ', updatedAccountBalance);
     setAccountInfo("updatedAccountBalance", `${updatedAccountBalanceDisplay}`);
 
 
@@ -722,8 +725,6 @@ function getRandomNumber(min, max) {
 
 function setTimer(time) {
     let timeleft = time / 1000; // Convert milliseconds to seconds
-
-    console.log('timeleft : ', timeleft);
 
     if (!isRunning) {
         timeleft = 0;

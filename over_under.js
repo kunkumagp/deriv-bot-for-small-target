@@ -8,7 +8,7 @@ const resetBotButton = document.getElementById("resetBot");
 let ws, apiToken, intervalId;
 let isRunning = false;
 
-let targetProfitPercentagePerSession = 1,
+let targetProfitPercentagePerSession = 0.5,
 amountPercentagePerTrade = 0.35,
 initialAmountPerTrade,
 targetProfitPerSession;
@@ -31,7 +31,6 @@ marketArray.forEach((item) => {
 
 // accountSelectElement.value = "YbaIy3dD51g2eoO";
 accountSelectElement.value = "lkUxtOopvUhCpIX";
-marketSelectElement.value = "R_50";
 apiToken = accountSelectElement.value;
 
 let sessionProfit = 0;
@@ -39,6 +38,7 @@ let logMessage;
 
 market = getRandomMarket(marketArray, '');
 // market = "R_50";
+marketSelectElement.value = market;
 
 resetBotButton.addEventListener('click', resetBot);
 
@@ -55,7 +55,7 @@ function startPing(ws) {
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ ping: 1 }));
         }
-    }, 30000);
+    }, 10000);
 }
 
 function stopPing() {
@@ -70,7 +70,6 @@ function startWebSocket(){
 
     ws.onopen = function () {
         console.log("Connection open");
-        console.log(apiToken);
         getAuthentication(ws, apiToken);
         startPing(ws); // Start pinging to keep connection alive
     };
@@ -83,7 +82,7 @@ function startWebSocket(){
 
         setTimeout(() => {
             startWebSocket();
-        }, 50000);
+        }, 1000);
     };
 
     ws.onerror = function (err) {
@@ -109,6 +108,26 @@ function startWebSocket(){
                     reload();
                 }
             }
+
+            if (wsResponse.msg_type === "history") {
+                const digits = wsResponse.history.prices.map(p => Number(String(p).slice(-1)));
+                const over1Count = digits.filter(d => d > 1).length;
+                const probability = (over1Count / digits.length) * 100;
+
+                console.log("Probability of last digit > 1:", probability.toFixed(2), "%");
+
+                const lastDigits = digits.slice(-3); // last 3 digits
+                if (probability >= 70) {
+                    console.log("Condition met. Placing Over 1 trade...");
+                    placeOUTrade(market); // enter Over 1
+                } else {
+                    console.log("Skipped trade. Probability too low:", probability.toFixed(2), "%");
+                    setTimeout(() => {
+                        runScriptForTrade(); // retry after short delay
+                    }, 1000);
+                }
+            }
+
 
             if (wsResponse.msg_type === "proposal") {
                 if (
@@ -169,21 +188,17 @@ function startWebSocket(){
 
 
                             // When Trade Loss
-                            timeInterval = 0;
-                            if(lostCountInRow >= 3){
-                                timeInterval = (getRandomNumber(150, 200) * 1000 );
-                                market = getRandomMarket(marketArray, market);
-                                setTimer(timeInterval);
-                                setTimeout(() => {
-                                    runScriptForTrade();
-                                }, timeInterval);
-                            } else if(lostCountInRow >= 1){
-                                timeInterval = (getRandomNumber(60, 90) * 1000 );
-                                setTimer(timeInterval);
-                                setTimeout(() => {
-                                    runScriptForTrade();
-                                }, timeInterval);
+                            timeInterval = 1 ;
+                            // timeInterval = (getRandomNumber(60, 120) * 1000 );
+
+                            if(lostCountInRow >= 2){
+                                timeInterval = (getRandomNumber(300, 400) * 1000 );
                             }
+
+                            setTimer(timeInterval);
+                            setTimeout(() => {
+                                runScriptForTrade();
+                            }, timeInterval);
                         } else {
                             // When Trade Win
                             localStorage.removeItem("currentLossAmount");
@@ -191,8 +206,8 @@ function startWebSocket(){
                             localStorage.removeItem('totalLostAmount');
 
                             if(currentProfitAmount >= targetProfitPerSession){
-                                timeInterval = (getRandomNumber(120, 180) * 1000 );
-                                console.log('timeInterval : ', timeInterval);
+                                // timeInterval = (getRandomNumber(120, 180) * 1000 );
+                                timeInterval = (getRandomNumber(1, 10) * 1000 );
                                 setTimer(timeInterval);
                                 setTimeout(() => {
                                     reload();
@@ -201,6 +216,8 @@ function startWebSocket(){
                                 runScriptForTrade();
                             }
                         }
+                        console.log("-----------------------------------\n New Trade \n");
+
                     } else {
                         setTimeout(() => {
                             setTickCountDown(
@@ -221,6 +238,10 @@ function startWebSocket(){
 // ---------------------------------------------------------------------
 
 const stakeChangeForOU = (status) => {
+    if(lostCountInRow >= 2){
+        martingaleMultiplier3 = 5.5
+    }
+                            
     if (status == "Loss") {
         stake = stake * martingaleMultiplier3;
     } else if (status == "Win") {
@@ -230,7 +251,6 @@ const stakeChangeForOU = (status) => {
 
 
 function setAccData(accData) {
-    // console.log(accData);
 
     // Set Initial Account Balance
     initialAccountBalance = Number(accData.balance);
@@ -273,9 +293,6 @@ function setAccData(accData) {
 
 
 function updateDetails(contract, lastTradeProfit) {
-
-    // console.log(contract);
-    // console.log(lastTradeProfit);
 
     // If Trade Win
     if(lastTradeProfit > 0){
@@ -362,5 +379,13 @@ function updateDetails(contract, lastTradeProfit) {
 
 function runScriptForTrade() {
     isRunning = true;
-    placeOUTrade(market);
+    // placeOUTrade(market);
+
+    // ✅ Step 1: Request last 100 ticks before trading
+    ws.send(JSON.stringify({
+        ticks_history: market,
+        end: "latest",
+        count: 1000,
+        style: "ticks"
+    }));
 }
