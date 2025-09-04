@@ -28,7 +28,8 @@ const now = new Date();
 
 let martingaleMultiplier1 = 2.8,
     martingaleMultiplier2 = 1.3,
-    martingaleMultiplier3 = 5;
+    martingaleMultiplier3 = 5,
+    martingaleMultiplier4 = 2.5;
 
 const accounts = [
     { name: "KunkumaGP", value: "lkUxtOopvUhCpIX" },

@@ -470,15 +470,17 @@ function setTradeParams(matcherNumber) {
 function changeStake(contract) {
 
     if(contract.status == "won") {
-        if (localStorage.getItem('lossRecovery') === 'true') {
-            stake = contract.profit;
-            localStorage.removeItem('lossRecovery');
-        } else {
-            stake = contract.buy_price + contract.profit;
-            if(stake > (initialAmountPerTrade * 2)) {
-                stake = stake - initialAmountPerTrade;
-            }
-        }
+        // if (localStorage.getItem('lossRecovery') === 'true') {
+        //     stake = contract.profit;
+        //     localStorage.removeItem('lossRecovery');
+        // } else {
+        //     stake = contract.buy_price + contract.profit;
+        //     if(stake > (initialAmountPerTrade * 2)) {
+        //         stake = stake - initialAmountPerTrade;
+        //     }
+        // }
+        
+        stake = initialAmountPerTrade;
         
     } else {
         // market = getRandomMarket(marketArray, market);
@@ -564,7 +566,10 @@ function updateDetails(contract) {
         stake = initialAmountPerTrade
 
         localStorage.setItem('lossRecovery', true);
-        timeInterval = getRandomNumber(10, 20) * 1000;
+        if (lossCountInRow >= 2) {
+            timeInterval = getRandomNumber(1, 180) * 1000;
+            // console.log('timeInterval : ', timeInterval);    
+        }
 
     }
 

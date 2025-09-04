@@ -29,8 +29,8 @@ marketArray.forEach((item) => {
 });
 
 
-// accountSelectElement.value = "YbaIy3dD51g2eoO";
-accountSelectElement.value = "lkUxtOopvUhCpIX";
+accountSelectElement.value = "YbaIy3dD51g2eoO";
+// accountSelectElement.value = "lkUxtOopvUhCpIX";
 apiToken = accountSelectElement.value;
 
 let sessionProfit = 0;
@@ -192,7 +192,7 @@ function startWebSocket(){
                             // timeInterval = (getRandomNumber(60, 120) * 1000 );
 
                             if(lostCountInRow >= 2){
-                                timeInterval = (getRandomNumber(300, 400) * 1000 );
+                                timeInterval = (getRandomNumber(180, 300) * 1000 );
                             }
 
                             setTimer(timeInterval);
@@ -238,12 +238,8 @@ function startWebSocket(){
 // ---------------------------------------------------------------------
 
 const stakeChangeForOU = (status) => {
-    if(lostCountInRow >= 2){
-        martingaleMultiplier3 = 5.5
-    }
-                            
     if (status == "Loss") {
-        stake = stake * martingaleMultiplier3;
+        stake = stake * martingaleMultiplier4;
     } else if (status == "Win") {
         stake = initialAmountPerTrade;
     }
@@ -284,7 +280,7 @@ function setAccData(accData) {
     const totalLostAmount = Number(localStorage.getItem('totalLostAmount'));
     if (!isNaN(totalLostAmount) && totalLostAmount < 0) {
         // Calculate stake to recover lost amount using martingale multiplier
-        stake = Math.abs(totalLostAmount) * martingaleMultiplier3;
+        stake = Math.abs(totalLostAmount) * martingaleMultiplier4;
         // Optionally, clear the lost amount after setting stake
         localStorage.removeItem('totalLostAmount');
         console.log('Recovered lost amount after reload. New stake:', stake);
