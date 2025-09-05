@@ -57,6 +57,8 @@ const marketArray = [
     { value: "1HZ100V", name: "Volatility 100 ( 1s ) Index" },
 ];
 
+
+
 const getAuthentication = (ws, apiToken) => {
     setFlashNotification("Authenticating....", 0);
     console.log("Authenticating....");
@@ -782,4 +784,48 @@ function updateNewAccBalance() {
     }
 
     setAccountInfo("updatedAccountBalance", `${updatedAccountBalanceDisplay}`);
+}
+
+
+
+
+function calculateEMA(values, period) {
+    if (values.length < period) return null;
+    return technicalindicators.EMA.calculate({ period, values }).slice(-1)[0];
+}
+
+function calculateRSI(values, period) {
+    if (values.length < period) return null;
+    return technicalindicators.RSI.calculate({ period, values }).slice(-1)[0];
+}
+
+function calculateMACD(values, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
+    if (values.length < slowPeriod) return null;
+    const macdInput = { values, fastPeriod, slowPeriod, signalPeriod };
+    const macdResult = technicalindicators.MACD.calculate(macdInput);
+    return macdResult.slice(-1)[0]; // { MACD, signal, histogram }
+}
+
+function checkVolatility(values, threshold = 0.05) {
+    if (values.length < 2) return false;
+    const lastDiff = Math.abs(values[values.length - 1] - values[values.length - 2]);
+    const lastPrice = values[values.length - 2];
+    return lastDiff / lastPrice <= threshold;
+}
+
+function getTradeDirection(ticks) {
+    const lastPrice = ticks[ticks.length - 1];
+
+    const ema = calculateEMA(ticks, 20);
+    const rsi = calculateRSI(ticks, 14);
+    const macd = calculateMACD(ticks);
+
+    if (!ema || !rsi || !macd) return null; // wait until enough data
+
+    if (!checkVolatility(ticks)) return null; // skip high volatility
+
+    if (lastPrice > ema && macd.MACD > macd.signal && rsi < 70) return "CALL";
+    if (lastPrice < ema && macd.MACD < macd.signal && rsi > 30) return "PUT";
+
+    return null;
 }

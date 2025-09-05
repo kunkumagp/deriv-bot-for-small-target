@@ -129,12 +129,14 @@ function startWebSocket() {
                         if (lowestProbabilityNumber.length === 1) {
                             matcherNumber = lowestProbabilityNumber[0];
 
-                            if(lastDigit.lastDigit == matcherNumber){
-                                // console.log("Make the Trade");
+                            // if(lastDigit.lastDigit == matcherNumber){
+                            //     // console.log("Make the Trade");
                                 
-                                makeTheTrade(ws);
-                                unsubscribeTicks();
-                            }
+                                
+                            // }
+
+                            makeTheTrade(ws);
+                            unsubscribeTicks();
                         }
 
                     });
@@ -189,6 +191,7 @@ function startWebSocket() {
                         lastTradeId = wsResponse.buy.contract_id;
                         updatedAccountBalance -= stake;
                         updateNewAccBalance();
+                        tradeType = "Digit Differ"
                         setResultNotification(lastTradeId, tradeType, market, wsResponse.buy.buy_price);
                         setTimeout(() => fetchTradeDetails(ws, lastTradeId, 1), 500);
                     }
