@@ -28,7 +28,7 @@ const now = new Date();
 
 let martingaleMultiplier1 = 2.8,
     martingaleMultiplier2 = 1.3,
-    martingaleMultiplier3 = 5;
+    martingaleMultiplier3 = 4;
 
 const accounts = [
     { name: "KunkumaGP", value: "lkUxtOopvUhCpIX" },
@@ -221,7 +221,7 @@ function placeOUTrade(market) {
     if (isTradeOpen == false) {
         let tradeState;
         let tradeRequest;
-        let barrierNumber = 1;
+        let barrierNumber = 2;
 
         tradeState = "DIGITOVER";
         tradeType = "over";
