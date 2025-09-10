@@ -49,7 +49,8 @@ reStartBotButton.addEventListener('click', reStartBot);
 // ---------------------------------------------------------------------
 
 
-webSocketConnectionStart();
+// webSocketConnectionStart();
+startWebSocket();
 
 
 
@@ -234,12 +235,14 @@ function startWebSocket(){
                                 // timeInterval = (getRandomNumber(60, 120) * 1000 );
                                 timeInterval = (getRandomNumber(1, 10) * 1000 );
 
-                                if(lostCountInRow >= 4){
+                                if(lostCountInRow >= 5){
+                                    webSocketConnectionStop();
+                                    setFlashNotification("Too many losses in a row. Stopping bot.", 1);
+                                    // timeInterval = (getRandomNumber(90, 600) * 1000 );
+                                } else if(lostCountInRow >= 4){
                                     // webSocketConnectionStop();
                                     // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
-                                    timeInterval = (getRandomNumber(90, 300) * 1000 );
-
-                                    return;
+                                    timeInterval = (getRandomNumber(90, 600) * 1000 );
                                 } else if(lostCountInRow >= 3){
                                     market = getRandomMarket(marketArray, market);
                                     timeInterval = (getRandomNumber(20, 90) * 1000 );
@@ -335,15 +338,15 @@ function setAccData(accData) {
 
 
     // Set Target Profit Amount Per Trade
-    // targetProfitPerSession = (initialAccountBalance * (targetProfitPercentagePerSession / 100)).toFixed(2);
-    targetProfitPerSession = targetProfitPercentagePerSession;
-    setAccountInfo("targetProfitPerSession", `$ ${targetProfitPerSession.toFixed(2)}`);
+    targetProfitPerSession = (initialAccountBalance * (targetProfitPercentagePerSession / 100)).toFixed(2);
+    // targetProfitPerSession = targetProfitPercentagePerSession;
+    setAccountInfo("targetProfitPerSession", `$ ${Number(targetProfitPerSession).toFixed(2)}`);
     localStorage.setItem('targetProfitPerSession', targetProfitPerSession);
 
     // Set Target Profit Amount Per Trade
-    // initialAmountPerTrade = (initialAccountBalance * (amountPercentagePerTrade / 100)).toFixed(2);
-    initialAmountPerTrade = amountPercentagePerTrade;
-    setAccountInfo("initialAmountPerTrade", `$ ${initialAmountPerTrade.toFixed(2)}`);
+    initialAmountPerTrade = (initialAccountBalance * (amountPercentagePerTrade / 100)).toFixed(2);
+    // initialAmountPerTrade = amountPercentagePerTrade;
+    setAccountInfo("initialAmountPerTrade", `$ ${Number(initialAmountPerTrade).toFixed(2)}`);
     localStorage.setItem('initialAmountPerTrade', initialAmountPerTrade);
 
 
@@ -448,7 +451,7 @@ function updateDetails(contract, lastTradeProfit) {
 }
 
 function runScriptForTrade() {
-    // isRunning = true;
+    isRunning = true;
     // placeOUTrade(market);
 
     // ✅ Step 1: Request last 100 ticks before trading
