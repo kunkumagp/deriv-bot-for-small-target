@@ -3,10 +3,14 @@ let pingIntervalId;
 const marketSelectElement = document.getElementById("market");
 const resetBotButton = document.getElementById("resetBot");
 const reStartBotButton = document.getElementById("reStartBot");
+const overUnderDigitSelect = document.getElementById("over_under_digits");
+
+
 
 
 let ws, apiToken, intervalId;
 let isRunning = false;
+let selectedOverUnderDigit;
 
 let targetProfitPercentagePerSession = 0.07,
 amountPercentagePerTrade = 0.1,
@@ -29,6 +33,49 @@ marketArray.forEach((item) => {
 });
 
 
+overUnderDigitArray.forEach((item) => {
+    const option = document.createElement("option");
+    option.value = item.digit;
+    option.textContent = item.name;
+    overUnderDigitSelect.appendChild(option);
+});
+
+// overUnderDigitSelect.value = "2";
+
+
+const selectedOverUnderDigitStored = localStorage.hasOwnProperty("selectedOverUnderDigit") ? localStorage.getItem("selectedOverUnderDigit") : null;
+
+if(
+    selectedOverUnderDigitStored && 
+    (
+        selectedOverUnderDigitStored !== "undefined" || 
+        selectedOverUnderDigitStored !== null || 
+        selectedOverUnderDigitStored !== "" || 
+        selectedOverUnderDigitStored !== undefined
+    )
+){
+    selectedOverUnderDigit = JSON.parse(selectedOverUnderDigitStored);
+    overUnderDigitSelect.value = selectedOverUnderDigit.digit;
+} else {
+    overUnderDigitSelect.value = "2";
+    selectedOverUnderDigit = overUnderDigitArray.find(
+        (item) => item.name === overUnderDigitSelect.value
+    );
+}
+
+
+
+
+// listen for user changes
+overUnderDigitSelect.addEventListener("change", (e) => {
+    selectedOverUnderDigit = overUnderDigitArray.find(
+        (item) => item.digit === e.target.value
+    );
+    console.log("Selected:", selectedOverUnderDigit);
+    localStorage.setItem("selectedOverUnderDigit", JSON.stringify(selectedOverUnderDigit));
+});
+
+
 accountSelectElement.value = "YbaIy3dD51g2eoO";
 // accountSelectElement.value = "lkUxtOopvUhCpIX";
 apiToken = accountSelectElement.value;
@@ -47,62 +94,8 @@ reStartBotButton.addEventListener('click', reStartBot);
 
 // ---------------------------------------------------------------------
 
-
-// webSocketConnectionStart();
 startWebSocket();
 
-
-
-function reStartBot() {
-    // const getLostAmount = localStorage.getItem("currentLossAmount");
-    // stake = getLostAmount * 1.5;
-
-    // console.log('Lost amount:', getLostAmount);
-    // console.log('Restarting bot with stake:', stake);
-    // isRunning = true;
-
-    
-    webSocketConnectionStart();
-
-
-    // runScriptForTrade();
-}
-
-
-
-function webSocketConnectionStart(){
-    isRunning = true;
-    console.log('WebSocket connection started.');
-    startWebSocket()
-    
-};
-
-function webSocketConnectionStop(){
-    stopPing();
-    isRunning = false;
-    clearInterval(intervalId); // Stop the interval loop
-    weClose();
-    console.log('WebSocket connection stopped.');
-};
-
-
-
-
-function startPing(ws) {
-    // Send a ping every 30 seconds
-    pingIntervalId = setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ ping: 1 }));
-        }
-    }, 10000);
-}
-
-function stopPing() {
-    if (pingIntervalId) {
-        clearInterval(pingIntervalId);
-        pingIntervalId = null;
-    }
-}
 
 function startWebSocket(){
     ws = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
@@ -131,7 +124,7 @@ function startWebSocket(){
     };
 
     ws.onmessage = function (event) {
-        if(isWithinTimeRange()){
+        // if(isWithinTimeRange()){
             wsResponse = JSON.parse(event.data);
 
             if (wsResponse != null) {
@@ -144,30 +137,41 @@ function startWebSocket(){
                     if (wsResponse?.authorize?.balance !== undefined && wsResponse.authorize.balance !== null) {
                         // Set Account Details and trading Data
                         setAccData(wsResponse.authorize);
-                        let targetProfitPerSession = localStorage.getItem('targetProfitPerSession');
                         runScriptForTrade();
+                        // subscribeTicks(market);
+
                     } else if (wsResponse?.error?.code !== undefined && wsResponse.error.code === "WrongResponse") {
                         reload();
                     }
                 }
 
                 if (wsResponse.msg_type === "history") {
+                    console.log('Selected Over/Under Digit:', selectedOverUnderDigit);
+
                     const digits = wsResponse.history.prices.map(p => Number(String(p).slice(-1)));
-                    const over2Count = digits.filter(d => d > 2).length;
-                    const probability = (over2Count / digits.length) * 100;
-
-                    console.log("Probability of last digit > 2:", probability.toFixed(2), "%");
-
+                    const overCount = digits.filter(d => d > selectedOverUnderDigit.digit).length;
+                    const probability = (overCount / digits.length) * 100;
                     const lastDigits = digits.slice(-3); // last 3 digits
-                    if (probability >= 70) {
-                        console.log("Condition met. Placing Over 2 trade...");
-                        placeOUTrade(market); // enter Over 2
+                    // ensure both sides are numbers before comparing
+                    const isMatch = lastDigits.includes(Number(selectedOverUnderDigit.digit));
+
+                    console.log("Digit:", selectedOverUnderDigit.digit);
+                    console.log("Found in lastDigits?", isMatch);
+                    // get last value of digits
+                    const lastValue = digits[digits.length - 1];
+                    console.log("Last 3 digits:", lastDigits);
+                    console.log("Probability of last digit >", selectedOverUnderDigit.digit, ":", probability.toFixed(2), "%");
+
+                    if ((probability >= 70 && !isMatch) || (probability < 70 && isMatch)) {
+                        console.log("Condition met. Placing Over ", selectedOverUnderDigit.digit, " trade...");
+                        placeOUTrade(market, selectedOverUnderDigit); 
                     } else {
-                        console.log("Skipped trade. Probability too low:", probability.toFixed(2), "%");
                         setTimeout(() => {
                             runScriptForTrade(); // retry after short delay
                         }, 1000);
                     }
+
+                    
                 }
 
 
@@ -287,14 +291,28 @@ function startWebSocket(){
                         }
                     }
                 }
-            }
-        }
-    }
 
+
+            }
+        // }
+    };
+}
+
+function runScriptForTrade() {
+    isRunning = true;
+    // placeOUTrade(market);
+
+    // ✅ Step 1: Request last 100 ticks before trading
+    ws.send(JSON.stringify({
+        ticks_history: market,
+        end: "latest",
+        count: 1000,
+        style: "ticks"
+    }));
 }
 
 
- function weClose() {
+function weClose(){
     if (ws) {
         ws.close();
         ws = null;
@@ -302,15 +320,54 @@ function startWebSocket(){
 }
 
 
+function reStartBot() {
+    webSocketConnectionStart();
+}
+
+function webSocketConnectionStart(){
+    isRunning = true;
+    console.log('WebSocket connection started.');
+    startWebSocket()
+    
+};
+
+function webSocketConnectionStop(){
+    stopPing();
+    isRunning = false;
+    clearInterval(intervalId); // Stop the interval loop
+    weClose();
+    console.log('WebSocket connection stopped.');
+};
+
+
+function startPing(ws) {
+    // Send a ping every 30 seconds
+    pingIntervalId = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ ping: 1 }));
+        }
+    }, 10000);
+}
+
+function stopPing() {
+    if (pingIntervalId) {
+        clearInterval(pingIntervalId);
+        pingIntervalId = null;
+    }
+}
+
+
+
 // ---------------------------------------------------------------------
 
 const stakeChangeForOU = (status) => {
-    if(lostCountInRow >= 2){
-        martingaleMultiplier3 = 3.5
-    }
-                            
+
+    const nextStake = calculateMartingale(currentLossAmount, selectedOverUnderDigit, "over");
+
+    // console.log("Next stake:", nextStake);
+    console.log("Next stake:", Math.abs(nextStake.toFixed(2)));
     if (status == "Loss") {
-        stake = stake * martingaleMultiplier3;
+        stake = Math.abs(nextStake.toFixed(2));
     } else if (status == "Win") {
         stake = initialAmountPerTrade;
     }
@@ -449,18 +506,6 @@ function updateDetails(contract, lastTradeProfit) {
     
 }
 
-function runScriptForTrade() {
-    isRunning = true;
-    // placeOUTrade(market);
-
-    // ✅ Step 1: Request last 100 ticks before trading
-    ws.send(JSON.stringify({
-        ticks_history: market,
-        end: "latest",
-        count: 1000,
-        style: "ticks"
-    }));
-}
 
 
 function isWithinTimeRange() {
@@ -475,3 +520,47 @@ function isWithinTimeRange() {
 }
 
 
+
+// ====== SUBSCRIBE TICKS ====== //
+function subscribeTicks(symbol) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ ticks: symbol }));
+    } else {
+        console.log("⚠️ WebSocket is not open. Cannot subscribe to ticks.");
+    }
+}
+
+// ====== UNSUBSCRIBE TICKS ====== //
+function unsubscribeTicks() {
+    if (tickSubscriptionId) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ forget: tickSubscriptionId }));
+            console.log("🛑 Tick subscription cancelled:", tickSubscriptionId);
+        } else {
+            console.log("⚠️ WebSocket is not open. Cannot unsubscribe.");
+        }
+        tickSubscriptionId = null;
+    } else {
+        console.log("⚠️ No active tick subscription to cancel.");
+    }
+}
+
+
+function calculateMartingale(lostAmount, selectedOverUnderDigit, type = "over") {
+    // pick correct payout %
+    const payoutPercentage = type === "over" 
+        ? selectedOverUnderDigit.over_payout_percentage 
+        : selectedOverUnderDigit.under_payout_percentage;
+
+    if (!payoutPercentage || payoutPercentage <= 0) {
+        throw new Error("Invalid payout percentage");
+    }
+
+    // required stake
+    const stake = (lostAmount * 1.5) / (payoutPercentage / 100);
+
+    return Number(stake.toFixed(2)); // round to 2 decimals
+}
+
+
+// if 0.12 / 0.35, then 0.35 / x 

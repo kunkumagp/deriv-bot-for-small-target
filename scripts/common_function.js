@@ -56,6 +56,20 @@ const marketArray = [
     { value: "1HZ100V", name: "Volatility 100 ( 1s ) Index" },
 ];
 
+
+const overUnderDigitArray = [
+    { digit: 0, name: "0", over_payout_percentage: 9, under_payout_percentage: null },
+    { digit: 1, name: "1", over_payout_percentage: 23, under_payout_percentage: 793 },
+    { digit: 2, name: "2", over_payout_percentage: 40, under_payout_percentage: 372 },
+    { digit: 3, name: "3", over_payout_percentage: 63, under_payout_percentage: 221 },
+    { digit: 4, name: "4", over_payout_percentage: 95, under_payout_percentage: 143 },
+    { digit: 5, name: "5", over_payout_percentage: 143, under_payout_percentage: 95 },
+    { digit: 6, name: "6", over_payout_percentage: 221, under_payout_percentage: 63 },
+    { digit: 7, name: "7", over_payout_percentage: 372, under_payout_percentage: 40 },
+    { digit: 8, name: "8", over_payout_percentage: 793, under_payout_percentage: 23 },
+    { digit: 9, name: "9", over_payout_percentage: null, under_payout_percentage: 9 },
+];
+
 const getAuthentication = (ws, apiToken) => {
     setFlashNotification("Authenticating....", 0);
     console.log("Authenticating....");
@@ -217,11 +231,11 @@ function placeTrade(prediction = null, duration = null , tradeingType = null) {
 
 
 
-function placeOUTrade(market) {
+function placeOUTrade(market, selectedbarrierNumber = null) {
     if (isTradeOpen == false) {
         let tradeState;
         let tradeRequest;
-        let barrierNumber = 2;
+        let barrierNumber = selectedbarrierNumber !== null ? selectedbarrierNumber.digit :2;
 
         tradeState = "DIGITOVER";
         tradeType = "over";
