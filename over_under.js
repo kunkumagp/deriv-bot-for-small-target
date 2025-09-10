@@ -9,8 +9,8 @@ const reStartBotButton = document.getElementById("reStartBot");
 let ws, apiToken, intervalId;
 let isRunning = false;
 
-let targetProfitPercentagePerSession = 0.3,
-amountPercentagePerTrade = 0.35,
+let targetProfitPercentagePerSession = 0.07,
+amountPercentagePerTrade = 0.1,
 initialAmountPerTrade,
 targetProfitPerSession;
 
