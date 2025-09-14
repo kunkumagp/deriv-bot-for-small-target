@@ -222,6 +222,7 @@ function placeTrade(prediction = null, duration = null , tradeingType = null) {
 
 
         tradesOn = true;
+        isTradeOpen = true;
 
         onTradeCount = 1;
         console.log("Sending trade request with prediction:", tradeRequest);
