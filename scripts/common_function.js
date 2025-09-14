@@ -797,3 +797,32 @@ function updateNewAccBalance() {
 
     setAccountInfo("updatedAccountBalance", `${updatedAccountBalanceDisplay}`);
 }
+
+
+function predictByMarkov(numbers) {
+  const transitions = Array.from({ length: 10 }, () => Array(10).fill(0));
+
+  // Build transition matrix
+  for (let i = 0; i < numbers.length - 1; i++) {
+    const current = numbers[i];
+    const next = numbers[i + 1];
+    transitions[current][next] += 1;
+  }
+
+  const lastDigit = numbers[numbers.length - 1];
+  const nextCounts = transitions[lastDigit];
+  const total = nextCounts.reduce((a, b) => a + b, 0);
+
+  let probabilities;
+  if (total > 0) {
+    probabilities = nextCounts.map(count => (count / total * 100).toFixed(2) + "%");
+  } else {
+    probabilities = Array(10).fill("0.00%");
+  }
+
+  // Best guess = digit with highest chance after lastDigit
+  const bestDigit = nextCounts.indexOf(Math.max(...nextCounts));
+
+  return { lastDigit, probabilities, bestDigit };
+}
+

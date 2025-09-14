@@ -12,6 +12,8 @@ let ws, apiToken, intervalId;
 let isRunning = false;
 let selectedOverUnderDigit;
 let lostRecoveryMode = false;
+let buyRequest = null;
+let lowDigitArray = [];
 
 let targetProfitPercentagePerSession = 0.07,
 // amountPercentagePerTrade = 0.35,
@@ -142,8 +144,7 @@ function startWebSocket(){
                             setAccData(wsResponse.authorize);
 
                         }
-                        runScriptForTrade();
-                        // subscribeTicks(market);
+                        placeOUTrade(market, selectedOverUnderDigit); 
 
                     } else if (wsResponse?.error?.code !== undefined && wsResponse.error.code === "WrongResponse") {
                         reload();
@@ -151,64 +152,64 @@ function startWebSocket(){
                 }
 
                 if (wsResponse.msg_type === "history") {
-                    // console.log('Selected Over/Under Digit:', selectedOverUnderDigit);
 
-                    // const digits = wsResponse.history.prices.map(p => Number(String(p).slice(-1)));
                     const lastDigitsNumbers = getLastDigits(wsResponse.history.prices);
                     const digitPercentages = getDigitPercentages(lastDigitsNumbers);
                     const targetDigit = Number(selectedOverUnderDigit.digit);
                     const overCount = lastDigitsNumbers.filter(d => d > selectedOverUnderDigit.digit).length;
                     const probability = (overCount / lastDigitsNumbers.length) * 100;
-                    const last2Digits = lastDigitsNumbers.slice(-2);
+                    const lastDigits = lastDigitsNumbers.slice(-3);
 
                     // build range [0..targetDigit]
                     const range = Array.from({ length: targetDigit + 1 }, (_, i) => i);
-                    // console.log('lastDigitsNumbers : ',lastDigitsNumbers);
-                    // console.log("percentages : ", digitPercentages);
-
-                    const isMatch = isDigitInRange(selectedOverUnderDigit.digit, lastDigitsNumbers.slice(-1));
-// console.log(result);
-
-                    console.log('range : ',range);
-                    
-
-
-
-                    let predictionValue = predictOverUnder(lastDigitsNumbers);
-                    // console.log('predictionValue : ',predictionValue);
-
-                    const maxDigit = Object.keys(digitPercentages).reduce((a, b) =>
-                        digitPercentages[a] > digitPercentages[b] ? a : b
-                    );
-
-                    // check if any number in range exists in lastDigits
-                    const isInRange = range.some(num => maxDigit);
-                    console.log('Last number : ',lastDigitsNumbers.slice(-1));
-                    // console.log('isMatch : ',isMatch);
-
-
                     // get last value of digits
-                    // console.log("Last 3 digits:", last2Digits);
-
+                    // console.log("Last 3 digits:", lastDigits);
                     setFlashNotification("Analizing....", 0);
 
-
-
-                    console.log("Last 2 digits:", last2Digits);
-                    console.log("Probability of last digit >", selectedOverUnderDigit.digit, ":", probability.toFixed(2), "%");
-                    console.log("isMatch", isMatch);
+                    // console.log("Last 2 digits:", lastDigits);
+                    // console.log("Probability of last digit >", selectedOverUnderDigit.digit, ":", probability.toFixed(2), "%");
+                    // console.log("isMatch", isMatch);
                     // console.log("Is in range?", isInRange);
-                    console.log("maxDigit", maxDigit);
+                    // console.log("percentages : ", digitPercentages);
+                    // console.log("maxDigit", maxDigit);
+
+                    console.log('range : ',range);
 
 
-                    if((probability >= 70 && !isMatch.lastMatch) || (probability < 70 && isMatch.lastMatch) || (currentLossAmount < 0 && maxDigit !== selectedOverUnderDigit.digit)){
+                    let markovPrediction = predictByMarkov(lastDigitsNumbers)
+                    console.log("Markov Prediction:", predictByMarkov(lastDigitsNumbers));
+
+                    // Convert to numbers (remove % and parse as float)
+                    const values = markovPrediction.probabilities.map(p => parseFloat(p));
+
+                    const maxValue = Math.max(...values);
+                    const maxIndex = values.indexOf(maxValue);
+
+                    console.log("Max Percentage:", maxValue + "%");
+                    console.log("Index:", maxIndex);
+
+
+                    const isInRange = range.includes(markovPrediction.bestDigit) ? true : false;
+                    console.log('isInRange : ',isInRange);
+                    // console.log('maxDigit : ',maxDigit);
+                    console.log('------------------------------');
+                    console.log('');
+
+                    lowDigitArray.push(markovPrediction.bestDigit);
+                    if(lowDigitArray.length >= 5){
+                        reload();
+                    }
+
+
+                    if(!isInRange || (currentLossAmount < 0 && isInRange)){
                         console.log("Condition met. Placing Over ", selectedOverUnderDigit.digit, " trade...");
                         setFlashNotification("Placing a trade", 0);
-                        placeOUTrade(market, selectedOverUnderDigit); 
+                        ws.send(JSON.stringify(buyRequest));
+
                     } else {
                         setTimeout(() => {
                             runScriptForTrade(); // retry after short delay
-                        }, 1000);
+                        }, 500);
                     }
                     
                 }
@@ -228,7 +229,22 @@ function startWebSocket(){
                         }
                     } else {
                         tradeProposal = wsResponse;
-                        makeTheTrade(ws);
+
+                        if (
+                            tradeProposal.proposal == undefined ||
+                            tradeProposal.proposal.id == undefined
+                        ) {
+                            isRunning = false;
+                            // webSocketConnectionStart();
+                        } else {
+                            buyRequest = {
+                                buy: tradeProposal.proposal.id,
+                                price: tradeProposal.proposal.ask_price,
+                            };
+                            console.log('buyRequest : ',buyRequest);
+                            runScriptForTrade();
+
+                        }
                     }
                 }
 
@@ -269,46 +285,64 @@ function startWebSocket(){
                             const profit = contract.profit;
                             const result = profit > 0 ? "Win" : "Loss";
                             updateDetails(contract, profit);
-                            stakeChangeForOU(result);
+                            // stakeChangeForOU(result);
                             isTradeOpen = false;
+
 
                             if (currentLossAmount < 0) {
                                 localStorage.setItem("totalLostAmount",currentLossAmount );
 
 
                                 // When Trade Loss
-                                timeInterval = 1000 ;
+                                // timeInterval = 1000 ;
                                 // timeInterval = (getRandomNumber(60, 120) * 1000 );
-                                // timeInterval = (getRandomNumber(1, 10) * 1000 );
+                                timeInterval = (getRandomNumber(1, 30) * 1000 );
 
-                                if(lostCountInRow >= 5){
-                                    // webSocketConnectionStop();
-                                    // lostRecoveryMode = true;
-                                    // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
-                                } else if(lostCountInRow >= 4){
+                                // if(lostCountInRow >= 5){
+                                //     // webSocketConnectionStop();
+                                //     // lostRecoveryMode = true;
+                                //     // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
+                                // } else if(lostCountInRow >= 4){
+                                //     webSocketConnectionStop();
+                                //     // reStartBot();
+                                //     lostRecoveryMode = true;
+                                //     setFlashNotification("Too many losses in a row. Stopping bot.", 1);
+                                //     // timeInterval = (getRandomNumber(60, 120) * 1000 );
+                                // } else if(lostCountInRow >= 3){
+                                //     // webSocketConnectionStop();
+                                //     // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
+                                //     timeInterval = (getRandomNumber(30, 60) * 1000 );
+                                // } else if(lostCountInRow >= 2){
+                                //     market = getRandomMarket(marketArray, market);
+                                //     timeInterval = (getRandomNumber(15, 30) * 1000 );
+                                // } else if(lostCountInRow >= 1){
+                                //     timeInterval = (getRandomNumber(1, 15) * 1000 );
+                                // }
+
+                                if(lostCountInRow >= 3){
                                     webSocketConnectionStop();
-                                    // reStartBot();
-                                    lostRecoveryMode = true;
                                     setFlashNotification("Too many losses in a row. Stopping bot.", 1);
-                                    // timeInterval = (getRandomNumber(60, 120) * 1000 );
-                                } else if(lostCountInRow >= 3){
-                                    // webSocketConnectionStop();
-                                    // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
-                                    timeInterval = (getRandomNumber(30, 60) * 1000 );
+                                    // timeInterval = (getRandomNumber(30, 60) * 1000 );
                                 } else if(lostCountInRow >= 2){
-                                    market = getRandomMarket(marketArray, market);
-                                    timeInterval = (getRandomNumber(15, 30) * 1000 );
+                                    webSocketConnectionStop();
+                                    setFlashNotification("Too many losses in a row. Stopping bot.", 1);
+                                    // market = getRandomMarket(marketArray, market);
+                                    // timeInterval = (getRandomNumber(60, 120) * 1000 );
                                 } else if(lostCountInRow >= 1){
-                                    timeInterval = (getRandomNumber(1, 15) * 1000 );
+                                    timeInterval = (getRandomNumber(1, 60) * 1000 );
                                 }
 
 
                                
                                 setTimer(timeInterval);
                                 setTimeout(() => {
-                                    runScriptForTrade();
+                                    // runScriptForTrade();
+                                    lostRecoverer(result);
+
                                 }, timeInterval);
                             } else {
+                                lostRecoverer(result);
+
                                 // When Trade Win
                                 localStorage.removeItem("currentLossAmount");
                                 localStorage.removeItem("lossTradeCount");
@@ -336,7 +370,9 @@ function startWebSocket(){
                                     timeInterval = (getRandomNumber(1, 10) * 1000 );
                                     setTimer(timeInterval);
                                     setTimeout(() => {
-                                        runScriptForTrade();
+                                        // runScriptForTrade();
+                                        placeOUTrade(market, selectedOverUnderDigit); 
+
                                     }, timeInterval);
                                 }
                             }
@@ -785,4 +821,35 @@ function isDigitInRange(selectedDigit, lastNumbers) {
   const lastMatch = lastNumbers.some(num => validDigits.includes(num));
 
   return { lastMatch };
+}
+
+
+function lostRecoverer(tradeStatus) {
+    console.log('tradeStatus : ',tradeStatus);
+    
+
+    if(tradeStatus == "Loss"){
+        selectedOverUnderDigit = overUnderDigitArray.find(
+            (item) => item.name === "1"
+        );
+
+        console.log('Selected Over/Under Number changed as 1');
+        
+        setTimeout(() => {
+            const nextStake = calculateMartingale(currentLossAmount, selectedOverUnderDigit, "over");
+            stake = Math.abs(nextStake.toFixed(2));
+            console.log('New Stake for number 1',stake);
+
+        }, 1000);
+
+        setTimeout(() => {
+            placeOUTrade(market, selectedOverUnderDigit); 
+            // runScriptForTrade();
+        }, 2000);
+
+        // placeOUTrade(market, selectedOverUnderDigit); 
+    } else {
+        stake = initialAmountPerTrade;
+    }
+    
 }
