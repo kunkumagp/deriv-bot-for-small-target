@@ -321,7 +321,7 @@ function setAccData(accData) {
 
     // Set Initial Account Balance
 
-    let accountBalance = (Number(accData.balance)-200);
+    let accountBalance = (Number(accData.balance));
 
     initialAccountBalance = accountBalance;
     setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance.toFixed(2)}`);

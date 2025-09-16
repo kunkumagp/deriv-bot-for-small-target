@@ -740,10 +740,17 @@ function getRandomNumber(min, max) {
 function setTimer(time) {
     let timeleft = time / 1000; // Convert milliseconds to seconds
 
-    if (!isRunning) {
-        timeleft = 0;
+
+
+    if (timeleft  == 0) {
         stopTimer = true;
     }
+
+    //     console.log('time: ', time);
+    // console.log('timeleft: ', timeleft);
+    // console.log('isRunning: ', isRunning);
+    // console.log('stopTimer: ', stopTimer);
+    
 
     let timer = setInterval(function () {
         if (timeleft <= 0) {
@@ -825,3 +832,253 @@ function predictByMarkov(numbers) {
   return { lastDigit, probabilities, bestDigit };
 }
 
+
+
+
+function getLastDigits(numbers) {
+    const decimalCount = getMajorityDecimalCount(numbers).majorityDecimalPlaces;
+
+  return numbers.map(num => {
+    const str = getLastDigit(num, decimalCount).toString();               // convert number to string
+    const lastChar = str[str.length - 1];     // take last character
+    return parseInt(lastChar, 10);            // convert back to number
+  });
+}
+
+function getLastDigit(num, decimals = 3) {
+  // force fixed decimals, so 5976.31 becomes "5976.310"
+  const str = num.toFixed(decimals);
+  return parseInt(str[str.length - 1], 10);
+}
+
+function getMajorityDecimalCount(numbers) {
+  const counts = {};
+
+  for (const num of numbers) {
+    // Convert to string, split decimals
+    const str = num.toString();
+    const decimalPart = str.includes('.') ? str.split('.')[1] : '';
+    const decimalCount = decimalPart.length;
+
+    // Count occurrences of each decimal length
+    counts[decimalCount] = (counts[decimalCount] || 0) + 1;
+  }
+
+  // Find the decimal length with max frequency
+  let majorityCount = null;
+  let maxFrequency = 0;
+
+  for (const [decimals, frequency] of Object.entries(counts)) {
+    if (frequency > maxFrequency) {
+      maxFrequency = frequency;
+      majorityCount = decimals;
+    }
+  }
+
+  return {
+    majorityDecimalPlaces: Number(majorityCount),
+    counts
+  };
+}
+
+
+function analyzeDigits(arr) {
+    if (!Array.isArray(arr) || arr.length === 0) {
+        return { evenPercent: 0, oddPercent: 0, prediction: null };
+    }
+
+    let evenCount = 0;
+    let oddCount = 0;
+
+    arr.forEach(num => {
+        if (num % 2 === 0) {
+            evenCount++;
+        } else {
+            oddCount++;
+        }
+    });
+
+    const total = evenCount + oddCount;
+    const evenPercent = ((evenCount / total) * 100).toFixed(2);
+    const oddPercent = ((oddCount / total) * 100).toFixed(2);
+
+    // Prediction: pick the higher probability
+    let prediction;
+    let predictionPercent;
+    if (evenCount > oddCount) {
+        prediction = "Even";
+        predictionPercent = evenPercent;
+    } else if (oddCount > evenCount) {
+        prediction = "Odd";
+        predictionPercent = oddPercent;
+    } else {
+        prediction = "Neutral (50/50)";
+        predictionPercent = 50;
+    }
+
+    return {
+        evenPercent: Number(evenPercent),
+        oddPercent: Number(oddPercent),
+        prediction,
+        predictionPercent: Number(predictionPercent)
+    };
+}
+
+function predictEvenOddByPercentages(freqMap) {
+    if (typeof freqMap !== "object" || Object.keys(freqMap).length === 0) {
+        return { evenPercent: 0, oddPercent: 0, prediction: null };
+    }
+
+    let evenCount = 0;
+    let oddCount = 0;
+
+    for (const [digit, count] of Object.entries(freqMap)) {
+        if (parseInt(digit) % 2 === 0) {
+            evenCount += count;
+        } else {
+            oddCount += count;
+        }
+    }
+
+    const total = evenCount + oddCount;
+    const evenPercent = ((evenCount / total) * 100).toFixed(2);
+    const oddPercent = ((oddCount / total) * 100).toFixed(2);
+
+    // Prediction based on higher percentage
+    let prediction;
+    let probability;
+    if (evenCount > oddCount) {
+        prediction = "Even";
+        probability = evenPercent;
+    } else if (oddCount > evenCount) {
+        prediction = "Odd";
+        probability = oddPercent;
+    } else {
+        prediction = "Neutral (50/50)";
+        probability = 50;
+    }
+
+    return {
+        evenPercent: Number(evenPercent),
+        oddPercent: Number(oddPercent),
+        prediction,
+        probability: Number(probability)
+    };
+}
+
+
+
+function getDigitPercentages(digits) {
+  const counts = Array(10).fill(0);
+
+  // Count occurrences
+  digits.forEach(d => counts[d]++);
+
+  const total = digits.length;
+
+  // Convert to percentages (as numbers, no "%")
+  const percentages = counts.map(c => Number(((c / total) * 100).toFixed(2)));
+
+  // Return as object { digit: percentage }
+  return Object.fromEntries(counts.map((_, i) => [i, percentages[i]]));
+}
+
+function updateDetails(contract, lastTradeProfit) {
+
+    // If Trade Win
+    if(lastTradeProfit > 0){
+        winTradeCount = winTradeCount + 1;
+        lostCountInRow = 0;
+        totalProfitAmount = totalProfitAmount + lastTradeProfit;
+    } else {
+        lossTradeCount = lossTradeCount + 1;
+        lostCountInRow = lostCountInRow + 1;
+        totalLossAmount = totalLossAmount + lastTradeProfit;
+    }
+
+    currentProfitAmount = currentProfitAmount + lastTradeProfit;
+    currentLossAmount = currentLossAmount + lastTradeProfit;
+    if(currentLossAmount >= 0){currentLossAmount = 0;}
+
+    updatedAccountBalance = initialAccountBalance + currentProfitAmount;
+
+    netProfit = updatedAccountBalance - initialAccountBalance;
+    updateNewAccBalance();
+
+
+    // console.log('-------------------------------------');
+    // console.log('updatedAccountBalance : ', updatedAccountBalance);
+    // console.log('netProfit : ', netProfit);
+    // console.log('-------------------------------------');
+
+    setResultNotification(
+        lastTradeId,
+        tradeType,
+        market,
+        contract.buy_price,
+        lastTradeProfit
+    );
+
+    setAccountInfo("totalTradeCount", `${totalTradeCount}`);
+    setAccountInfo("winCount", `${winTradeCount}`);
+    setAccountInfo("lossCount", `${lossTradeCount}`);
+
+
+    let updatedAccountBalanceDisplay = null;
+    if (updatedAccountBalance > initialAccountBalance) {
+        updatedAccountBalanceDisplay = `<span class="green">$ ${updatedAccountBalance.toFixed(2)}</span>`;
+    } else if (updatedAccountBalance < initialAccountBalance) {
+        updatedAccountBalanceDisplay = `<span class="red">$ ${updatedAccountBalance.toFixed(2)}</span>`;
+    }
+    setAccountInfo("updatedAccountBalance", `${updatedAccountBalanceDisplay}`);
+
+
+    let netProfitDisplay = null;
+    if (netProfit > 0) {
+        netProfitDisplay = `<span class="green">$ ${netProfit.toFixed(2)}</span>`;
+    } else if (netProfit < 0) {
+        netProfitDisplay = `<span class="red">$ ${netProfit.toFixed(2)}</span>`;
+    }
+    setAccountInfo("net_profit", `${netProfitDisplay}`);
+  
+
+    let currentProfitAmountDisplay = null;
+    if (currentProfitAmount < 0) {
+        currentProfitAmountDisplay = `<span class="red">$ ${currentProfitAmount.toFixed(2)}</span>`;
+    } else if (currentProfitAmount > 0) {
+        currentProfitAmountDisplay = `<span class="green">$ ${currentProfitAmount.toFixed(2)}</span>`;
+    } else {
+        currentProfitAmountDisplay = `$ ${currentProfitAmount.toFixed(2)}`;
+    }
+    setAccountInfo("currentProfitAmount", `${currentProfitAmountDisplay}`);
+
+
+
+    let currentLossAmountDisplay = null;
+    if (currentLossAmount < 0) {
+        currentLossAmountDisplay = `<span class="red">$ ${currentLossAmount.toFixed(2)}</span>`;
+    } else if (currentLossAmount > 0) {
+        currentLossAmountDisplay = `<span class="green">$ ${currentLossAmount.toFixed(2)}</span>`;
+    } else {
+        currentLossAmountDisplay = `$ ${currentLossAmount.toFixed(2)}`;
+    }
+    setAccountInfo("currentLossAmount", `${currentLossAmountDisplay}`);
+
+
+    
+}
+
+
+function calculateMartingale(lostAmount, selectedOverUnderDigit, type = "over") {
+    // pick correct payout %
+    const payoutPercentage = 23;
+
+    if (!payoutPercentage || payoutPercentage <= 0) {
+        throw new Error("Invalid payout percentage");
+    }
+
+    // required stake
+    const stake = (lostAmount * 1.5) / (payoutPercentage / 100);
+
+    return Number(stake.toFixed(2)); // round to 2 decimals
+}

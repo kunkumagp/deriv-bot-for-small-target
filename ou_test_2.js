@@ -155,7 +155,7 @@ function startWebSocket(){
                 }
 
                 if (wsResponse.msg_type === "history") {
-                     const lastDigitsNumbers = getLastDigits(wsResponse.history.prices);
+                    const lastDigitsNumbers = getLastDigits(wsResponse.history.prices);
                     const digitPercentages = getDigitPercentages(lastDigitsNumbers);
                     const targetDigit = Number(selectedOverUnderDigit.digit);
                     const overCount = lastDigitsNumbers.filter(d => d > selectedOverUnderDigit.digit).length;
@@ -224,6 +224,8 @@ function startWebSocket(){
                         // webSocketConnectionStop();
                         console.log("Web socket connection lost");
                         setFlashNotification("Web socket connection lost", 0);
+
+                        console.log("lostRecoveryMode: ", lostRecoveryMode);
 
                         if (lostRecoveryMode) {
                             startWebSocket();
@@ -308,14 +310,14 @@ function startWebSocket(){
                                 } else if(lostCountInRow >= 4){
                                     // webSocketConnectionStop();
                                     // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
-                                    timeInterval = (getRandomNumber(90, 600) * 1000 );
+                                    timeInterval = (getRandomNumber(120, 600) * 1000 );
                                 } else if(lostCountInRow >= 3){
                                     market = getRandomMarket(marketArray, market);
                                     // webSocketConnectionStop();
                                     // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
-                                    timeInterval = (getRandomNumber(20, 90) * 1000 );
+                                    timeInterval = (getRandomNumber(60, 120) * 1000 );
                                 } else if(lostCountInRow >= 2){
-                                    timeInterval = (getRandomNumber(10, 20) * 1000 );
+                                    timeInterval = (getRandomNumber(10, 60) * 1000 );
                                 }
                                
                                 setTimer(timeInterval);
@@ -399,8 +401,8 @@ function weClose(){
 
 
 function reStartBot() {
-    webSocketConnectionStart();
     lostRecoveryMode = true;
+    webSocketConnectionStart();
 }
 
 function webSocketConnectionStart(){
@@ -457,7 +459,7 @@ function setAccData(accData) {
 
     // Set Initial Account Balance
 
-    let accountBalance = (Number(accData.balance));
+    let accountBalance = (Number(accData.balance) - 400);
 
     initialAccountBalance = accountBalance;
     setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance.toFixed(2)}`);
@@ -496,6 +498,7 @@ function setAccData(accData) {
         stake = Math.abs(totalLostAmountFromLocalStorage) * martingaleMultiplier3;
         // Optionally, clear the lost amount after setting stake
         // localStorage.removeItem('totalLostAmount');
+        lostRecoveryMode = true;
         console.log('Recovered lost amount after reload. New stake:', stake);
     } else {
         stake = initialAmountPerTrade;
