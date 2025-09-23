@@ -42,17 +42,17 @@ const accounts = [
 
 const marketArray = [
     { value: "R_10", name: "Volatility 10 Index" },
-    { value: "R_25", name: "Volatility 25 Index" },
-    { value: "R_50", name: "Volatility 50 Index" },
-    { value: "R_75", name: "Volatility 75 Index" },
-    { value: "R_100", name: "Volatility 100 Index" },
     { value: "1HZ10V", name: "Volatility 10 ( 1s ) Index" },
     { value: "1HZ15V", name: "Volatility 15 ( 1s ) Index" },
+    { value: "R_25", name: "Volatility 25 Index" },
     { value: "1HZ25V", name: "Volatility 25 ( 1s ) Index" },
     { value: "1HZ30V", name: "Volatility 30 ( 1s ) Index" },
+    { value: "R_50", name: "Volatility 50 Index" },
     { value: "1HZ50V", name: "Volatility 50 ( 1s ) Index" },
+    { value: "R_75", name: "Volatility 75 Index" },
     { value: "1HZ75V", name: "Volatility 75 ( 1s ) Index" },
     { value: "1HZ90V", name: "Volatility 90 ( 1s ) Index" },
+    { value: "R_100", name: "Volatility 100 Index" },
     { value: "1HZ100V", name: "Volatility 100 ( 1s ) Index" },
 ];
 
@@ -232,7 +232,7 @@ function placeTrade(prediction = null, duration = null , tradeingType = null) {
 
 
 
-function placeOUTrade(market, selectedbarrierNumber = null) {
+function placeOUTrade(market, selectedbarrierNumber = null, initialAccountBalance = null) {
     if (isTradeOpen == false) {
         let tradeState;
         let tradeRequest;
@@ -242,6 +242,8 @@ function placeOUTrade(market, selectedbarrierNumber = null) {
         tradeType = "over";
         stake = Number(stake);
         stake < 0.35 ? (stake = 0.35) : (stake = stake);
+
+        stake > initialAccountBalance ? (initialAccountBalance = initialAccountBalance + 200): (initialAccountBalance = initialAccountBalance)
 
         tradeRequest = {
             proposal: 1,
@@ -826,3 +828,20 @@ function predictByMarkov(numbers) {
   return { lastDigit, probabilities, bestDigit };
 }
 
+
+
+function calculateMartingale(lostAmount, selectedOverUnderDigit, type = "over") {
+    // pick correct payout %
+    const payoutPercentage = type === "over" 
+        ? selectedOverUnderDigit.over_payout_percentage 
+        : selectedOverUnderDigit.under_payout_percentage;
+
+    if (!payoutPercentage || payoutPercentage <= 0) {
+        throw new Error("Invalid payout percentage");
+    }
+
+    // required stake
+    const stake = (lostAmount * 1.5) / (payoutPercentage / 100);
+
+    return Number(stake.toFixed(2)); // round to 2 decimals
+}

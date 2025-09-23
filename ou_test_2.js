@@ -61,7 +61,7 @@ if(
     selectedOverUnderDigit = JSON.parse(selectedOverUnderDigitStored);
     overUnderDigitSelect.value = selectedOverUnderDigit.digit;
 } else {
-    overUnderDigitSelect.value = "3";
+    overUnderDigitSelect.value = "2";
     selectedOverUnderDigit = overUnderDigitArray.find(
         (item) => item.name === overUnderDigitSelect.value
     );
@@ -144,7 +144,7 @@ function startWebSocket(){
                             setAccData(wsResponse.authorize);
 
                         }
-                        placeOUTrade(market, selectedOverUnderDigit); 
+                        placeOUTrade(market, selectedOverUnderDigit, initialAccountBalance); 
 
                     } else if (wsResponse?.error?.code !== undefined && wsResponse.error.code === "WrongResponse") {
                         reload();
@@ -296,7 +296,7 @@ function startWebSocket(){
                                 // When Trade Loss
                                 // timeInterval = 1000 ;
                                 // timeInterval = (getRandomNumber(60, 120) * 1000 );
-                                timeInterval = (getRandomNumber(1, 30) * 1000 );
+                                timeInterval = (getRandomNumber(1, 10) * 1000 );
 
                                 // if(lostCountInRow >= 5){
                                 //     // webSocketConnectionStop();
@@ -329,7 +329,7 @@ function startWebSocket(){
                                     // market = getRandomMarket(marketArray, market);
                                     // timeInterval = (getRandomNumber(60, 120) * 1000 );
                                 } else if(lostCountInRow >= 1){
-                                    timeInterval = (getRandomNumber(1, 60) * 1000 );
+                                    timeInterval = (getRandomNumber(1, 5) * 1000 );
                                 }
 
 
@@ -371,7 +371,7 @@ function startWebSocket(){
                                     setTimer(timeInterval);
                                     setTimeout(() => {
                                         // runScriptForTrade();
-                                        placeOUTrade(market, selectedOverUnderDigit); 
+                                        placeOUTrade(market, selectedOverUnderDigit, initialAccountBalance); 
 
                                     }, timeInterval);
                                 }
@@ -501,10 +501,13 @@ function setDayTarget() {
     const today = new Date();
     const formatted = today.toISOString().split("T")[0];
 
-
-    if(!targetAccountBalancePerToday && formatted !== date){
+    if(formatted !== date){
         localStorage.setItem('targetAccountBalancePerToday', (initialAccountBalance * 2));
         localStorage.setItem('date', formatted);
+    } else {
+        if(!targetAccountBalancePerToday){
+            localStorage.setItem('targetAccountBalancePerToday', (initialAccountBalance * 2));
+        }
     }
 }
 
@@ -552,7 +555,8 @@ function setAccData(accData) {
     
     if (!isNaN(totalLostAmountFromLocalStorage) && totalLostAmountFromLocalStorage < 0) {
         // Calculate stake to recover lost amount using martingale multiplier
-        stake = Math.abs(totalLostAmountFromLocalStorage) * martingaleMultiplier3;
+        stake = calculateMartingale(Math.abs(totalLostAmountFromLocalStorage), selectedOverUnderDigit, "over");
+
         // Optionally, clear the lost amount after setting stake
         // localStorage.removeItem('totalLostAmount');
         console.log('Recovered lost amount after reload. New stake:', stake);
@@ -843,7 +847,7 @@ function lostRecoverer(tradeStatus) {
         }, 1000);
 
         setTimeout(() => {
-            placeOUTrade(market, selectedOverUnderDigit); 
+            placeOUTrade(market, selectedOverUnderDigit, initialAccountBalance); 
             // runScriptForTrade();
         }, 2000);
 
