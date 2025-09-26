@@ -3,6 +3,7 @@ let pingIntervalId;
 const marketSelectElement = document.getElementById("market");
 const resetBotButton = document.getElementById("resetBot");
 const reStartBotButton = document.getElementById("reStartBot");
+const params = new URLSearchParams(window.location.search);
 
 
 let ws, apiToken, intervalId;
@@ -12,8 +13,11 @@ let targetProfitPercentagePerSession = 0.01,
 amountPercentagePerTrade = 0.1,
 initialAmountPerTrade,
 nextTradeStake,
+userTokenByUrl=null,
+spareAmount=0,
 targetProfitPerSession;
 let selectedOverUnderDigit;
+let isMartingaleApplied = true;
 
 
 accounts.forEach((item) => {
@@ -35,9 +39,22 @@ selectedOverUnderDigit = overUnderDigitArray.find(
     (item) => item.name === "2"
 );
 
+if(params.get("user")){
+    userTokenByUrl = params.get("user");
+} 
 
-accountSelectElement.value = "YbaIy3dD51g2eoO";
+if(params.get("spare")){
+    spareAmount = params.get("spare");
+} 
+
+
+
 // accountSelectElement.value = "lkUxtOopvUhCpIX";
+if(userTokenByUrl != null){
+    accountSelectElement.value = userTokenByUrl;
+} else{
+    accountSelectElement.value = "YbaIy3dD51g2eoO";
+}
 apiToken = accountSelectElement.value;
 
 let sessionProfit = 0;
@@ -170,30 +187,49 @@ function startWebSocket(){
 
                     let lastDigits = digits.slice(-3); // last 3 digits
                     console.log('Last 3 digits:', lastDigits);
-                    
-                    if (probability >= 70) {
-                        console.log("Condition met. Placing Over 2 trade...");
 
-                        if(lostCountInRow >= 3){
-                            if(lastDigits.includes(0) || lastDigits.includes(1) || lastDigits.includes(2)){
-                                console.log("Changed market due to consecutive losses and unfavorable last digits:", market);
-                                placeOUTrade(market);
+                    if(isMartingaleApplied){
+                        if (probability >= 70) {
+                            console.log("Condition met. Placing Over 2 trade...");
+
+                            if(lostCountInRow >= 1){
+                                // if (isReadyForDigitOver2(lastDigits)) {
+                                //     console.log("✅ Ready to trade Digit Over 2");
+                                //     console.log("Changed market due to consecutive losses and unfavorable last digits:", market);
+                                //     placeOUTrade(market);
+                                // } else {
+                                //     console.log("❌ Not ready yet");
+                                //     console.log("Skipped trade. Probability too low:", probability.toFixed(2), "%");
+                                //     setTimeout(() => {
+                                //         runScriptForTrade(); // retry after short delay
+                                //     }, 1000);
+                                // }
+                                
+                                
+                                if(lastDigits.includes(0) || lastDigits.includes(1) || lastDigits.includes(2)){
+                                    console.log("Changed market due to consecutive losses and unfavorable last digits:", market);
+                                    placeOUTrade(market);
+                                } else {
+                                    setTimeout(() => {
+                                        runScriptForTrade(); // retry after short delay
+                                    }, 1000);
+                                }
                             } else {
-                                setTimeout(() => {
-                                    runScriptForTrade(); // retry after short delay
-                                }, 1000);
+                                placeOUTrade(market); // enter Over 2
                             }
+                            
                         } else {
-                            placeOUTrade(market); // enter Over 2
+                            console.log("Skipped trade. Probability too low:", probability.toFixed(2), "%");
+                            setTimeout(() => {
+                                runScriptForTrade(); // retry after short delay
+                            }, 1000);
                         }
-                                    
-                        
                     } else {
-                        console.log("Skipped trade. Probability too low:", probability.toFixed(2), "%");
-                        setTimeout(() => {
-                            runScriptForTrade(); // retry after short delay
-                        }, 1000);
+                        placeOUTrade(market);
                     }
+
+                    
+                    
                 }
 
 
@@ -251,57 +287,88 @@ function startWebSocket(){
                             stakeChangeForOU(result);
                             isTradeOpen = false;
 
-                            if (currentLossAmount < 0) {
-                                localStorage.setItem("totalLostAmount",currentLossAmount );
+                            if(isMartingaleApplied){
+
+                                if (currentLossAmount < 0) {
+                                    localStorage.setItem("totalLostAmount",currentLossAmount );
 
 
-                                // When Trade Loss
-                                // timeInterval = 1 ;
-                                // timeInterval = (getRandomNumber(60, 120) * 1000 );
-                                timeInterval = (getRandomNumber(1, 10) * 1000 );
+                                    // When Trade Loss
+                                    // timeInterval = 1 ;
+                                    // timeInterval = (getRandomNumber(60, 120) * 1000 );
+                                    timeInterval = (getRandomNumber(1, 10) * 1000 );
 
-                                if(lostCountInRow >= 5){
-                                    webSocketConnectionStop();
-                                    setFlashNotification("Too many losses in a row. Stopping bot.", 1);
-                                    // timeInterval = (getRandomNumber(90, 600) * 1000 );
-                                } else if(lostCountInRow >= 4){
-                                    // webSocketConnectionStop();
-                                    // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
-                                    // timeInterval = (getRandomNumber(90, 600) * 1000 );
-                                } else if(lostCountInRow >= 3){
-                                    market = getRandomMarket(marketArray, market);
-                                    // timeInterval = (getRandomNumber(20, 300) * 1000 );
-                                } else if(lostCountInRow >= 2){
-                                    // timeInterval = (getRandomNumber(1, 20) * 1000 );
-                                }
-                               
-                                setTimer(timeInterval);
-                                setTimeout(() => {
-                                    runScriptForTrade();
-                                }, timeInterval);
-                            } else {
-                                // When Trade Win
-                                localStorage.removeItem("currentLossAmount");
-                                localStorage.removeItem("lossTradeCount");
-                                localStorage.removeItem('totalLostAmount');
+                                    if(lostCountInRow >= 5){
+                                        webSocketConnectionStop();
+                                        setFlashNotification("Too many losses in a row. Stopping bot.", 1);
+                                        // timeInterval = (getRandomNumber(90, 600) * 1000 );
+                                    } else if(lostCountInRow >= 4){
+                                        webSocketConnectionStop();
+                                        setFlashNotification("Too many losses in a row. Stopping bot.", 1);
+                                        // timeInterval = (getRandomNumber(90, 600) * 1000 );
+                                    } else if(lostCountInRow >= 3){
+                                        // webSocketConnectionStop();
+                                        // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
+                                        // timeInterval = (getRandomNumber(20, 300) * 1000 );
+                                    } else if(lostCountInRow >= 2){
+                                        // market = getRandomMarket(marketArray, market);
+                                        // timeInterval = (getRandomNumber(1, 20) * 1000 );
+                                    } else if(lostCountInRow >= 1){
+                                        market = getRandomMarket(marketArray, market);
+                                        // timeInterval = (getRandomNumber(1, 20) * 1000 );
+                                    }
 
-                                if(currentProfitAmount >= targetProfitPerSession){
-                                    // timeInterval = (getRandomNumber(120, 180) * 1000 );
-                                    // timeInterval = (getRandomNumber(1, 10) * 1000 );
-                                    timeInterval = (getRandomNumber(1, 5) * 1000 );
-                                    setTimer(timeInterval);
-                                    setTimeout(() => {
-                                        reload();
-                                    }, timeInterval);
-                                } else {
-                                    timeInterval = 0;
-                                    // timeInterval = (getRandomNumber(1, 10) * 1000 );
+                                
                                     setTimer(timeInterval);
                                     setTimeout(() => {
                                         runScriptForTrade();
                                     }, timeInterval);
+                                } else {
+                                    // When Trade Win
+                                    localStorage.removeItem("currentLossAmount");
+                                    localStorage.removeItem("lossTradeCount");
+                                    localStorage.removeItem('totalLostAmount');
+
+                                    if(currentProfitAmount >= targetProfitPerSession){
+                                        // timeInterval = (getRandomNumber(120, 180) * 1000 );
+                                        // timeInterval = (getRandomNumber(1, 10) * 1000 );
+                                        timeInterval = (getRandomNumber(1, 5) * 1000 );
+                                        setTimer(timeInterval);
+                                        setTimeout(() => {
+                                            reload();
+                                        }, timeInterval);
+                                    } else {
+                                        timeInterval = 0;
+                                        // timeInterval = (getRandomNumber(1, 10) * 1000 );
+                                        setTimer(timeInterval);
+                                        setTimeout(() => {
+                                            runScriptForTrade();
+                                        }, timeInterval);
+                                    }
                                 }
+
+                            } else {
+                                timeInterval = 2000;
+                                
+
+                                if (profit < 0) {
+                                    market = getRandomMarket(marketArray, market);
+                                    timeInterval = (getRandomNumber(1, 10) * 1000 );
+                                }
+                                console.log('timeInterval:', timeInterval);
+                                console.log('lostCountInRow:', lostCountInRow);
+
+                                checkRefreshStatus();
+
+                                setTimer(timeInterval);
+                                setTimeout(() => {
+                                    runScriptForTrade();
+                                }, timeInterval);
+
                             }
+                            
+
+                            
                             console.log("-----------------------------------\n New Trade \n");
 
                         } else {
@@ -333,15 +400,19 @@ function startWebSocket(){
 // ---------------------------------------------------------------------
 
 const stakeChangeForOU = (status) => {
-    if (status == "Loss") {
-        // stake = stake * martingaleMultiplier3;
-        if(lostCountInRow >= 3){
-            stake = getA(Math.abs(Number(currentLossAmount)));   
-        } else {
-            stake = calculateMartingale(Math.abs(Number(currentLossAmount)), selectedOverUnderDigit, "over");
-        }
+    if(isMartingaleApplied){
+        if (status == "Loss") {
+            // stake = stake * martingaleMultiplier3;
+            if(lostCountInRow >= 3){
+                stake = getA(Math.abs(Number(currentLossAmount)));   
+            } else {
+                stake = calculateMartingale(Math.abs(Number(currentLossAmount)), selectedOverUnderDigit, "over");
+            }
 
-    } else if (status == "Win") {
+        } else if (status == "Win") {
+            stake = initialAmountPerTrade;
+        }
+    } else {
         stake = initialAmountPerTrade;
     }
 
@@ -351,10 +422,16 @@ const stakeChangeForOU = (status) => {
 
 
 function setAccData(accData) {
+    if(!isMartingaleApplied){
+        amountPercentagePerTrade = 1
+    }
+
+    console.log('isMartingaleApplied:', isMartingaleApplied);
+    console.log('amountPercentagePerTrade:', amountPercentagePerTrade);
 
     // Set Initial Account Balance
+    let accountBalance = (Number(accData.balance)-spareAmount);
 
-    let accountBalance = (Number(accData.balance)-900);
 
     initialAccountBalance = accountBalance;
     setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance.toFixed(2)}`);
@@ -386,24 +463,38 @@ function setAccData(accData) {
 
     stake = initialAmountPerTrade;
 
-    // Recover lost amount after reload if present in localStorage
-    const totalLostAmount = Number(localStorage.getItem('totalLostAmount'));
-    if (!isNaN(totalLostAmount) && totalLostAmount < 0) {
-        // Calculate stake to recover lost amount using martingale multiplier
-        // stake = Math.abs(totalLostAmount) * martingaleMultiplier3;
-        // stake = calculateMartingale(Math.abs(totalLostAmount), selectedOverUnderDigit, "over");
+    if(isMartingaleApplied){
+        // Recover lost amount after reload if present in localStorage
+        const totalLostAmount = Number(localStorage.getItem('totalLostAmount'));
+        if (!isNaN(totalLostAmount) && totalLostAmount < 0) {
+            // Calculate stake to recover lost amount using martingale multiplier
+            // stake = Math.abs(totalLostAmount) * martingaleMultiplier3;
+            // stake = calculateMartingale(Math.abs(totalLostAmount), selectedOverUnderDigit, "over");
 
-        if(Math.abs(totalLostAmount) >= (initialAmountPerTrade * 5)){
-            stake = getA(Math.abs(totalLostAmount));   
-        } else {
-            stake = calculateMartingale(Math.abs(totalLostAmount), selectedOverUnderDigit, "over");
+            if(Math.abs(totalLostAmount) >= (initialAmountPerTrade * 5)){
+                stake = getA(Math.abs(totalLostAmount));   
+            } else {
+                stake = calculateMartingale(Math.abs(totalLostAmount), selectedOverUnderDigit, "over");
+            }
+            
+
+            // Optionally, clear the lost amount after setting stake
+            // localStorage.removeItem('totalLostAmount');
+            console.log('Recovered lost amount after reload. New stake:', stake);
         }
-        
 
-        // Optionally, clear the lost amount after setting stake
-        // localStorage.removeItem('totalLostAmount');
-        console.log('Recovered lost amount after reload. New stake:', stake);
+        if(stake > initialAccountBalance && Number(accData.balance) > initialAccountBalance){
+
+            accountBalance = (Number(accData.balance));
+            initialAccountBalance = accountBalance;
+            updatedAccountBalance = accountBalance;
+            setAccountInfo("updatedAccountBalance", `$ ${updatedAccountBalance.toFixed(2)}`);
+            setAccountInfo("initialAccountBalance", `$ ${initialAccountBalance.toFixed(2)}`);
+            localStorage.setItem('initialAccountBalance', initialAccountBalance);
+
+        }
     }
+
 
     setNextTradeStake(stake);
 }
@@ -537,5 +628,16 @@ function setNextTradeStake(stakeAmount) {
     // targetProfitPerSession = targetProfitPercentagePerSession;
     setAccountInfo("nextTradeStake", `$ ${Number(nextTradeStake).toFixed(2)}`);
     localStorage.setItem('nextTradeStake', nextTradeStake);
+
+}
+
+function checkRefreshStatus(){
+    let targetPerSession = initialAmountPerTrade * (2/100);
+    console.log('Target per session:', targetPerSession);
+
+    if(currentProfitAmount >= targetPerSession){
+        console.log('Target profit achieved for the session. Reloading the bot.');
+        
+    }
 
 }

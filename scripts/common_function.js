@@ -845,3 +845,35 @@ function calculateMartingale(lostAmount, selectedOverUnderDigit, type = "over") 
 
     return Number(stake.toFixed(2)); // round to 2 decimals
 }
+
+
+function isReadyForDigitOver2(lastDigits) {
+  if (!Array.isArray(lastDigits) || lastDigits.length === 0) {
+    return false;
+  }
+
+  // --- 1. Frequency filter ---
+  const recentSample = lastDigits.slice(-30); // last 30 ticks
+  const lowDigitsCount = recentSample.filter(d => d <= 2).length;
+  const lowDigitRatio = lowDigitsCount / recentSample.length;
+
+  if (lowDigitRatio > 0.4) {
+    return true;
+  }
+
+  // --- 2. Consecutive low digits filter ---
+  const last = lastDigits.slice(-5); // check last 5 digits
+  let consecutive = 0;
+  for (let i = last.length - 1; i >= 0; i--) {
+    if (last[i] <= 2) {
+      consecutive++;
+      if (consecutive >= 2) {
+        return true;
+      }
+    } else {
+      break;
+    }
+  }
+
+  return false;
+}
