@@ -9,6 +9,7 @@ let initialAccountBalance = 0,
     amountPercentage = 0.35,
     targetPercentage = 0.1,
     isTradeOpen = false,
+    marketInterval=0,
     tradeProposal,
     lastTradeId,
     totalTradeCount = 0,
@@ -36,24 +37,23 @@ const accounts = [
     { name: "Kunkuma Trading", value: "YbaIy3dD51g2eoO" },
     { name: "W H K G Prasanna 85", value: "iVOpdm24hBhw3JI" },
     { name: "Zion Music 1985", value: "pfn80VW8Lexav5O" },
-
-    
+    { name: "Test Mail", value: "zAhDnvk9VOUB5rD" },
 ];
 
 const marketArray = [
-    { value: "R_10", name: "Volatility 10 Index" },
-    { value: "1HZ10V", name: "Volatility 10 ( 1s ) Index" },
-    { value: "1HZ15V", name: "Volatility 15 ( 1s ) Index" },
-    { value: "R_25", name: "Volatility 25 Index" },
-    { value: "1HZ25V", name: "Volatility 25 ( 1s ) Index" },
-    { value: "1HZ30V", name: "Volatility 30 ( 1s ) Index" },
-    { value: "R_50", name: "Volatility 50 Index" },
-    { value: "1HZ50V", name: "Volatility 50 ( 1s ) Index" },
-    { value: "R_75", name: "Volatility 75 Index" },
-    { value: "1HZ75V", name: "Volatility 75 ( 1s ) Index" },
-    { value: "1HZ90V", name: "Volatility 90 ( 1s ) Index" },
-    { value: "R_100", name: "Volatility 100 Index" },
-    { value: "1HZ100V", name: "Volatility 100 ( 1s ) Index" },
+    { value: "R_10", name: "Volatility 10 Index", interval: 2000 },
+    { value: "1HZ10V", name: "Volatility 10 ( 1s ) Index", interval: 1000 },
+    { value: "1HZ15V", name: "Volatility 15 ( 1s ) Index", interval: 1000 },
+    { value: "R_25", name: "Volatility 25 Index", interval: 2000 },
+    { value: "1HZ25V", name: "Volatility 25 ( 1s ) Index", interval: 1000 },
+    { value: "1HZ30V", name: "Volatility 30 ( 1s ) Index", interval: 1000 },
+    { value: "R_50", name: "Volatility 50 Index", interval: 2000 },
+    { value: "1HZ50V", name: "Volatility 50 ( 1s ) Index", interval: 1000 },
+    { value: "R_75", name: "Volatility 75 Index", interval: 2000 },
+    { value: "1HZ75V", name: "Volatility 75 ( 1s ) Index", interval: 1000 },
+    { value: "1HZ90V", name: "Volatility 90 ( 1s ) Index", interval: 1000 },
+    { value: "R_100", name: "Volatility 100 Index", interval: 2000 },
+    { value: "1HZ100V", name: "Volatility 100 ( 1s ) Index", interval: 1000 },
 ];
 
 
@@ -85,6 +85,7 @@ const makeTheTrade = (ws) => {
         isRunning = false;
         // webSocketConnectionStart();
     } else {
+        
         let buyRequest = {
             buy: tradeProposal.proposal.id,
             price: tradeProposal.proposal.ask_price,
@@ -232,26 +233,31 @@ function placeTrade(prediction = null, duration = null , tradeingType = null) {
 
 
 
-function placeOUTrade(market, selectedbarrierNumber = null, initialAccountBalance = null) {
+function placeOUTrade(market, selectedbarrierNumber = null, initialAccountBalance = null, tickDuration = 1) {
     if (isTradeOpen == false) {
         let tradeState;
         let tradeRequest;
         let barrierNumber = selectedbarrierNumber !== null ? selectedbarrierNumber.digit :2;
 
         tradeState = "DIGITOVER";
+        // tradeState = "DIGITUNDER";
         tradeType = "over";
         stake = Number(stake);
         stake < 0.35 ? (stake = 0.35) : (stake = stake);
 
         stake > initialAccountBalance ? (initialAccountBalance = initialAccountBalance + 200): (initialAccountBalance = initialAccountBalance)
+        // console.log("stake : ", stake);
+        // console.log("initialAccountBalance : ", initialAccountBalance);
+        
+        // stake > initialAccountBalance ? stake = Number(initialAccountBalance): stake = stake;
 
         tradeRequest = {
             proposal: 1,
             amount: stake.toFixed(2),
             basis: 'stake',
-            contract_type: 'DIGITOVER',
+            contract_type: tradeState,
             currency: 'USD',
-            duration: 1,
+            duration: tickDuration,
             duration_unit: 't',
             symbol: market,
             barrier: barrierNumber
@@ -512,6 +518,10 @@ function setFlashNotification(message, timeInSeconds) {
     }
 }
 
+function lastDigitNumberDisplay(digit) {
+    $("#ldp").html(digit);
+}
+
 function getRandomMarket(array, current) {
     let randomIndex;
     let randomMarket;
@@ -520,6 +530,8 @@ function getRandomMarket(array, current) {
         randomIndex = Math.floor(Math.random() * array.length);
         randomMarket = array[randomIndex];
     } while (randomMarket === current);
+
+    marketInterval = randomMarket.interval;
 
     return randomMarket.value;
 };
@@ -877,3 +889,72 @@ function isReadyForDigitOver2(lastDigits) {
 
   return false;
 }
+
+
+
+
+
+function getLastDigits(numbers) {
+    const decimalCount = getMajorityDecimalCount(numbers).majorityDecimalPlaces;
+
+  return numbers.map(num => {
+    const str = getLastDigit(num, decimalCount).toString();               // convert number to string
+    const lastChar = str[str.length - 1];     // take last character
+    return parseInt(lastChar, 10);            // convert back to number
+  });
+}
+
+
+function getDigitPercentages(digits) {
+  const counts = Array(10).fill(0);
+
+  // Count occurrences
+  digits.forEach(d => counts[d]++);
+
+  const total = digits.length;
+
+  // Convert to percentages (as numbers, no "%")
+  const percentages = counts.map(c => Number(((c / total) * 100).toFixed(2)));
+
+  // Return as object { digit: percentage }
+  return Object.fromEntries(counts.map((_, i) => [i, percentages[i]]));
+}
+
+
+
+function getLastDigit(num, decimals = 3) {
+  // force fixed decimals, so 5976.31 becomes "5976.310"
+  const str = num.toFixed(decimals);
+  return parseInt(str[str.length - 1], 10);
+}
+
+function getMajorityDecimalCount(numbers) {
+  const counts = {};
+
+  for (const num of numbers) {
+    // Convert to string, split decimals
+    const str = num.toString();
+    const decimalPart = str.includes('.') ? str.split('.')[1] : '';
+    const decimalCount = decimalPart.length;
+
+    // Count occurrences of each decimal length
+    counts[decimalCount] = (counts[decimalCount] || 0) + 1;
+  }
+
+  // Find the decimal length with max frequency
+  let majorityCount = null;
+  let maxFrequency = 0;
+
+  for (const [decimals, frequency] of Object.entries(counts)) {
+    if (frequency > maxFrequency) {
+      maxFrequency = frequency;
+      majorityCount = decimals;
+    }
+  }
+
+  return {
+    majorityDecimalPlaces: Number(majorityCount),
+    counts
+  };
+}
+
