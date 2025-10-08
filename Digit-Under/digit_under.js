@@ -30,6 +30,7 @@ let selectedOverUnderDigit;
 let isMartingaleApplied = true;
 let lowestEntry;
 let matcherDigitForDisplay;
+let targetPerSingleRun = 0.5;
 
 
     
@@ -300,6 +301,8 @@ function startWebSocket(){
                         if (contract.is_sold){
                             const profit = contract.profit;
                             const result = profit > 0 ? "Win" : "Loss";
+
+                            timeInterval = 1000 ;
                             
                             updateDetails(contract, profit);
                             stakeChangeForOU(result);
@@ -313,17 +316,17 @@ function startWebSocket(){
                                 // timeInterval = (getRandomNumber(60, 120) * 1000 );
 
                                 if(lostCountInRow >= 2){
-                                    timeInterval = (getRandomNumber(10, 30) * 1000 );
+                                    // timeInterval = (getRandomNumber(10, 30) * 1000 );
                                     setTimer(timeInterval);
                                     setTimeout(() => {
                                         // runScriptForTrade();
                                         // placeDigitDifferTrade(lowestEntry.digit);
                                         console.log('reloading bot');
                                         
-                                        reload();
+                                        // reload();
                                     }, timeInterval);
                                 } else {
-                                    timeInterval = (getRandomNumber(5, 10) * 1000 );
+                                    // timeInterval = (getRandomNumber(5, 10) * 1000 );
                                     setTimer(timeInterval);
                                     setTimeout(() => {
                                         // runScriptForTrade();
@@ -340,10 +343,10 @@ function startWebSocket(){
                                 localStorage.removeItem('lostCountInRow');
 
                                 // timeInterval = (getRandomNumber(1, 5) * 1000 );
-                                timeInterval = 1000 ;
+                                // timeInterval = 1000 ;
                                 setTimer(timeInterval);
                                 setTimeout(() => {
-                                    if(currentProfitAmount >= targetProfitPerSession){
+                                    if(currentProfitAmount >= targetPerSingleRun){
                                         reload();
                                     } else {
                                         runScriptForTrade();

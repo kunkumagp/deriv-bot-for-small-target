@@ -344,14 +344,14 @@ function startWebSocket(){
                                         // timeInterval = (getRandomNumber(90, 600) * 1000 );
                                         // reload();
                                     } else if(lostCountInRow >= 3){
-                                        webSocketConnectionStop();
-                                        setFlashNotification("Too many losses in a row. Stopping bot.", 1);
+                                        // webSocketConnectionStop();
+                                        // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
                                         // timeInterval = (getRandomNumber(300, 600) * 1000 );
                                     } else if(lostCountInRow >= 2){
                                         // webSocketConnectionStop();
                                         // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
                                         // timeInterval = (getRandomNumber(1, 20) * 1000 );
-                                        timeInterval = (getRandomNumber(20, 60) * 1000 );
+                                        // timeInterval = (getRandomNumber(20, 60) * 1000 );
                                     } else if(lostCountInRow >= 1){
                                         // market = getRandomMarket(marketArray2, market);
                                         // timeInterval = (getRandomNumber(1, 20) * 1000 );
