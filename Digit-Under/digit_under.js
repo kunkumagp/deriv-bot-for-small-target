@@ -219,6 +219,7 @@ function startWebSocket(){
 
                     if(lowestEntry === null) {
                         console.log("No unique lowest digit found. Retrying...");
+                        market = getRandomMarket(marketArray2, market);
                         setTimeout(() => {
                             runScriptForTrade();
                         }, 2000);
@@ -232,12 +233,15 @@ function startWebSocket(){
                     //     }
                     } else {
 
-                        
-
-                        if(lostCountInRow > 1){
-                            if(lastDigit == lowestEntry.digit){
-                                placeDigitDifferTrade(lowestEntry);
+                        if(lostCountInRow >= 1){
+                            if(lowestEntry.percentage < 9){
+                                if(lastDigit == lowestEntry.digit){
+                                    placeDigitDifferTrade(lowestEntry);
+                                } else {
+                                    runScriptForTrade();
+                                }
                             } else {
+                                market = getRandomMarket(marketArray2, market);
                                 runScriptForTrade();
                             }
                         } else {
@@ -316,14 +320,14 @@ function startWebSocket(){
                                 // timeInterval = (getRandomNumber(60, 120) * 1000 );
 
                                 if(lostCountInRow >= 2){
-                                    // timeInterval = (getRandomNumber(10, 30) * 1000 );
+                                    timeInterval = (getRandomNumber(10, 30) * 1000 );
                                     setTimer(timeInterval);
                                     setTimeout(() => {
                                         // runScriptForTrade();
                                         // placeDigitDifferTrade(lowestEntry.digit);
                                         console.log('reloading bot');
                                         
-                                        // reload();
+                                        reload();
                                     }, timeInterval);
                                 } else {
                                     // timeInterval = (getRandomNumber(5, 10) * 1000 );
@@ -664,9 +668,9 @@ function placeDigitDifferTrade(lowestEntry) {
         stake = nextTradeStake || initialAmountPerTrade;
         stake = Number(stake);
         stake < 0.35 ? (stake = 0.35) : (stake = stake);
-        if(currentProfitAmount > 0){
-            stake = stake + currentProfitAmount;
-        }
+        // if(currentProfitAmount > 0){
+        //     stake = stake + currentProfitAmount;
+        // }
 
         // Create the trade request for Digit Differs
         tradeRequest = {

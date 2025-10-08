@@ -240,6 +240,8 @@ function startWebSocket(){
                                     console.log("Changed market due to consecutive losses and unfavorable last digits:", market);
                                     placeOUTrade(market, selectedOverUnderDigit, initialAccountBalance, tickDuration);
                                 } else {
+                                    console.log("Waiting....");
+                                    setFlashNotification("Waiting for trade", 0);
                                     setTimeout(() => {
                                         runScriptForTrade(); // retry after short delay
                                     }, marketInterval);
@@ -252,6 +254,7 @@ function startWebSocket(){
                             
                         } else {
                             console.log("Skipped trade. Probability too low:", probability.toFixed(2), "%");
+                            setFlashNotification("Skipped trade. Probability too low:", probability.toFixed(2), "%", 0);
                             setTimeout(() => {
                                 runScriptForTrade(); // retry after short delay
                             }, marketInterval);
