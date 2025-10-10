@@ -1,5 +1,6 @@
 const accountSelectElement = document.getElementById("account_select");
 const marketSelectElement = document.getElementById("market");
+const tradingModeSelectElement = document.getElementById("trading_mode");
 const autoRunSelectElement = document.getElementById("auto_run");
 const startBotButton = document.getElementById("startBot");
 const resetBotButton = document.getElementById("resetBot");
@@ -16,6 +17,8 @@ let userTokenByUrl = null,
     marketHistoryData = {},
     analysisProgress = 0,
     totalMarketsToAnalyze = 0,
+    martingaleMultiplyr = 4, // Multiplier for Martingale recovery
+    tradingMode = "analyzing", // "analyzing" or "expansion"
     // Dual Trading System Variables
     tradingActive = false,
     // Martingale System Variables
@@ -23,6 +26,7 @@ let userTokenByUrl = null,
     currentStakeAmount = 0,
     martingaleActive = false,
     consecutiveLosses = 0,
+    totalAccumulatedLoss = 0, // Track total losses for recovery calculation
     maxStakeLimit = 0, // Will be set to 10% of initial balance
     maxConsecutiveLosses = 5, // Stop Martingale after 5 consecutive losses
     proposalsReady = false,
@@ -99,6 +103,15 @@ if (savedAutoRun) {
     autoRunSelectElement.value = savedAutoRun;
 }
 
+// Load trading_mode setting from localStorage
+const savedTradingMode = localStorage.getItem('trading_mode');
+if (savedTradingMode) {
+    tradingModeSelectElement.value = savedTradingMode;
+    tradingMode = savedTradingMode;
+} else {
+    tradingMode = "analyzing"; // Default mode
+}
+
 // Update status indicator
 function updateAutoRunStatus() {
     const autoRunStatus = document.getElementById('auto_run_status');
@@ -116,6 +129,13 @@ updateAutoRunStatus();
 autoRunSelectElement.addEventListener('change', function() {
     localStorage.setItem('auto_run', this.value);
     updateAutoRunStatus();
+});
+
+// Save trading_mode setting to localStorage when changed
+tradingModeSelectElement.addEventListener('change', function() {
+    localStorage.setItem('trading_mode', this.value);
+    tradingMode = this.value;
+    console.log(`🔄 Trading mode changed to: ${tradingMode}`);
 });
 
 // Auto-start bot if auto_run is true
@@ -146,7 +166,7 @@ function toggleBot() {
 
 function startBot() {
     console.log('🚀 Starting bot...');
-    console.log('🔍 Starting market analysis for digit "4" frequency...');
+    console.log(`🎯 Trading Mode: ${tradingMode.toUpperCase()}`);
     
     // Set trading as active
     tradingActive = true;
@@ -155,8 +175,15 @@ function startBot() {
     startBotButton.textContent = "Stop Bot";
     startBotButton.className = "btn btn-danger btn-block"; // Change to red color
     
-    // Start market analysis before trading
-    analyzeAllMarkets();
+    if (tradingMode === "analyzing") {
+        console.log('🔍 Starting market analysis for digit "4" frequency...');
+        // Start market analysis before trading
+        analyzeAllMarkets();
+    } else if (tradingMode === "expansion") {
+        console.log('🚀 Starting expansion trading (no market analysis)...');
+        // Skip market analysis and start trading immediately
+        startExpansionTrading();
+    }
 }
 
 function stopBot() {
@@ -182,6 +209,25 @@ function stopBot() {
     
     setFlashNotification("Bot stopped successfully", 3000);
     console.log('✅ Bot stopped');
+}
+
+// Expansion Trading Functions
+function startExpansionTrading() {
+    console.log('⚡ Starting Expansion Trading Mode...');
+    setFlashNotification("Expansion Trading: Starting immediately without market analysis...", 3000);
+    
+    // Use the first market from the array (or current selected market)
+    market = marketSelectElement.value || marketArray2[0].value;
+    console.log(`🎯 Using market: ${market} (${marketArray2.find(m => m.value === market)?.name || 'Unknown'})`);
+    
+    // Initialize WebSocket for trading
+    webSocket = new WebSocket("wss://ws.binaryws.com/websockets/v3?app_id=1089");
+    webSocketFunctions(webSocket);
+    
+    // Set flag to skip market analysis
+    marketAnalysisComplete = true;
+    
+    setFlashNotification("Expansion Trading: Connecting and preparing trades...", 2000);
 }
 
 // Market Analysis Functions
@@ -417,7 +463,12 @@ function ensureWebSocketConnection(callback, maxRetries = 5) {
 
 function initializeDualTradingSystem() {
     console.log('🎯 Initializing Dual Trading System...');
-    setFlashNotification("Preparing dual trades (Under 4 & Over 5)...", 3000);
+    
+    if (tradingMode === "analyzing") {
+        setFlashNotification("Preparing dual trades (Under 4 & Over 5)...", 3000);
+    } else if (tradingMode === "expansion") {
+        setFlashNotification("Expansion Trading: Preparing dual trades (Under 4 & Over 5)...", 3000);
+    }
     
     tradingActive = true;
     proposalsReady = false;
@@ -501,7 +552,12 @@ function startTickMonitoring() {
     
     console.log('👀 Starting real-time tick monitoring for trigger detection...');
     console.log(`📊 Target market: ${market}`);
-    setFlashNotification("Monitoring market ticks... Waiting for last digit = 5", 0);
+    
+    if (tradingMode === "analyzing") {
+        setFlashNotification("Monitoring market ticks... Waiting for last digit = 5", 0);
+    } else if (tradingMode === "expansion") {
+        setFlashNotification("Expansion Trading: Monitoring market ticks... Will execute on any tick", 0);
+    }
     
     // Check if WebSocket is ready before sending
     if (!isWebSocketReady()) {
@@ -550,7 +606,12 @@ function executeDualTrades() {
     }
     
     console.log('🚀 TRIGGER DETECTED! Executing dual trades instantly...');
-    setFlashNotification("🚀 DUAL TRADES EXECUTING! Last digit = 5", 3000);
+    
+    if (tradingMode === "analyzing") {
+        setFlashNotification("🚀 DUAL TRADES EXECUTING! Last digit = 5", 3000);
+    } else if (tradingMode === "expansion") {
+        setFlashNotification("⚡ EXPANSION TRADES EXECUTING! Immediate execution", 3000);
+    }
     
     waitingForTrigger = false;
     
@@ -679,48 +740,65 @@ function handleTradeOutcome(contractResult) {
             console.log(`⚖️ Dual trade pair BROKE EVEN: $0.00`);
         }
         
-        // Apply Martingale Strategy for dual trading
+        // Apply Cumulative Loss Recovery Martingale System
         const bothTradesLost = (underProfit <= 0 && overProfit <= 0);
         
         if (bothTradesLost) {
-            // Both trades lost - apply Martingale (double the stake)
+            // Both trades lost - calculate stake to recover all accumulated losses
             consecutiveLosses++;
+            
+            // Add current loss to total accumulated loss
+            const currentDualTradeLoss = Math.abs(balanceChange); // This is already positive
+            totalAccumulatedLoss += currentDualTradeLoss;
+            
+            console.log(`🔴 BOTH TRADES LOST - Cumulative Loss Recovery Martingale!`);
+            console.log(`   Current dual trade loss: $${currentDualTradeLoss.toFixed(2)}`);
+            console.log(`   Total accumulated losses: $${totalAccumulatedLoss.toFixed(2)}`);
+            console.log(`   Consecutive Losses: ${consecutiveLosses}/${maxConsecutiveLosses}`);
             
             // Check if we've reached maximum consecutive losses
             if (consecutiveLosses > maxConsecutiveLosses) {
-                // Reset to base stake instead of continuing Martingale
+                // Reset everything instead of continuing Martingale
                 currentStakeAmount = baseStakeAmount;
                 consecutiveLosses = 0;
+                totalAccumulatedLoss = 0;
                 martingaleActive = false;
-                console.log(`🛑 MAXIMUM CONSECUTIVE LOSSES REACHED - Martingale Reset!`);
-                console.log(`   Resetting from Martingale back to base stake: $${baseStakeAmount.toFixed(2)}`);
+                console.log(`🛑 MAXIMUM CONSECUTIVE LOSSES REACHED - Complete Reset!`);
+                console.log(`   Resetting back to base stake: $${baseStakeAmount.toFixed(2)}`);
                 console.log(`   ⚠️  Safety mechanism activated after ${maxConsecutiveLosses} consecutive losses`);
+                console.log(`   🗑️  Clearing accumulated losses: $${totalAccumulatedLoss.toFixed(2)}`);
             } else {
-                const proposedStake = baseStakeAmount * Math.pow(2, consecutiveLosses);
+                // Calculate stake needed to recover all accumulated losses
+                // Formula: We need to win enough to cover all losses
+                // Since only 1 trade wins out of 2, and payout is ~95%
+                // Required stake per trade = (Total Losses × 4) to ensure recovery
+                const requiredStakePerTrade = totalAccumulatedLoss * martingaleMultiplyr;
                 
                 // Apply safety limit - don't exceed maxStakeLimit
-                if (proposedStake <= maxStakeLimit) {
-                    currentStakeAmount = proposedStake;
+                if (requiredStakePerTrade <= maxStakeLimit) {
+                    currentStakeAmount = requiredStakePerTrade;
                     martingaleActive = true;
-                    console.log(`🔴 BOTH TRADES LOST - Martingale Applied!`);
-                    console.log(`   Consecutive Losses: ${consecutiveLosses}/${maxConsecutiveLosses}`);
-                    console.log(`   Next Stake: $${currentStakeAmount.toFixed(2)} (${Math.pow(2, consecutiveLosses)}x base)`);
+                    console.log(`   📊 Calculated recovery stake: $${requiredStakePerTrade.toFixed(2)}`);
+                    console.log(`   🎯 Next stake per trade: $${currentStakeAmount.toFixed(2)}`);
+                    console.log(`   📈 Expected dual trade risk: $${(currentStakeAmount * 2).toFixed(2)}`);
                 } else {
                     currentStakeAmount = maxStakeLimit;
                     martingaleActive = true;
-                    console.log(`🔴 BOTH TRADES LOST - Martingale CAPPED at Maximum!`);
-                    console.log(`   Consecutive Losses: ${consecutiveLosses}/${maxConsecutiveLosses}`);
-                    console.log(`   Next Stake: $${currentStakeAmount.toFixed(2)} (MAX LIMIT REACHED)`);
-                    console.log(`   ⚠️  Would have been: $${proposedStake.toFixed(2)} but limited to $${maxStakeLimit.toFixed(2)}`);
+                    console.log(`   ⚠️  Required stake $${requiredStakePerTrade.toFixed(2)} exceeds limit`);
+                    console.log(`   🔒 Capping at maximum stake: $${maxStakeLimit.toFixed(2)}`);
+                    console.log(`   📈 Dual trade risk capped at: $${(maxStakeLimit * 2).toFixed(2)}`);
                 }
             }
         } else {
-            // At least one trade won - reset Martingale
-            if (martingaleActive) {
-                console.log(`🟢 TRADE WON - Martingale Reset!`);
-                console.log(`   Resetting from $${currentStakeAmount.toFixed(2)} back to base $${baseStakeAmount.toFixed(2)}`);
+            // At least one trade won - reset everything back to base
+            if (martingaleActive || totalAccumulatedLoss > 0) {
+                console.log(`🟢 TRADE WON - Complete Recovery!`);
+                console.log(`   Previous accumulated losses: $${totalAccumulatedLoss.toFixed(2)}`);
+                console.log(`   Previous stake: $${currentStakeAmount.toFixed(2)}`);
+                console.log(`   Resetting to base stake: $${baseStakeAmount.toFixed(2)}`);
             }
             consecutiveLosses = 0;
+            totalAccumulatedLoss = 0; // Clear all accumulated losses
             currentStakeAmount = baseStakeAmount;
             martingaleActive = false;
         }
@@ -730,14 +808,15 @@ function handleTradeOutcome(contractResult) {
         
         // Display stake with Martingale status and loss recovery info
         let stakeDisplay = `$ ${Number(nextTradeStake).toFixed(2)}`;
-        if (martingaleActive) {
-            stakeDisplay += ` 🔥 (${Math.pow(2, consecutiveLosses)}x)`;
+        if (martingaleActive && totalAccumulatedLoss > 0) {
+            const recoveryMultiplier = (currentStakeAmount / baseStakeAmount).toFixed(1);
+            stakeDisplay += ` 🔥 (${recoveryMultiplier}x recovery)`;
         }
         
         // Check if there's still loss recovery pending
         const pendingLoss = localStorage.getItem('carriedOverLoss');
         if (pendingLoss && Number(pendingLoss) > 0) {
-            stakeDisplay += ` 🔄 (+$${Number(pendingLoss).toFixed(2)} recovery)`;
+            stakeDisplay += ` 🔄 (+$${Number(pendingLoss).toFixed(2)} carry-over)`;
         }
         
         setAccountInfo("nextTradeStake", stakeDisplay);
@@ -914,12 +993,19 @@ function displayDualTradeHeader() {
     const now = new Date();
     const timestamp = now.toLocaleString();
     
+    let triggerText;
+    if (tradingMode === "analyzing") {
+        triggerText = "Last digit = 5";
+    } else if (tradingMode === "expansion") {
+        triggerText = "Immediate execution";
+    }
+    
     const headerHtml = `
         <div class="alert alert-warning" style="margin-bottom: 15px; padding: 15px; border-radius: 5px; background: #fff3cd; border: 1px solid #ffeaa7;">
             <div style="text-align: center;">
                 <h4 style="margin: 0; color: #856404;">🚀 DUAL TRADE EXECUTED</h4>
                 <div style="margin-top: 5px;">
-                    <strong>Trigger:</strong> Last digit = 5 | <strong>Market:</strong> ${market}
+                    <strong>Mode:</strong> ${tradingMode.charAt(0).toUpperCase() + tradingMode.slice(1)} | <strong>Trigger:</strong> ${triggerText} | <strong>Market:</strong> ${market}
                 </div>
                 <div style="margin-top: 5px; font-size: 12px; color: #666;">
                     ${timestamp}
@@ -968,6 +1054,11 @@ function resetBot() {
     waitingForTrigger = false;
     activeTrades = [];
     tradingCycleCount = 0; // Reset cycle counter
+    
+    // Reset Martingale system
+    consecutiveLosses = 0;
+    totalAccumulatedLoss = 0;
+    martingaleActive = false;
     
     // Reset dual trade pair tracking
     currentDualTradePair = {
@@ -1048,6 +1139,7 @@ function setAccData(accData) {
     baseStakeAmount = Number(initialAmountPerTrade);
     currentStakeAmount = baseStakeAmount;
     consecutiveLosses = 0;
+    totalAccumulatedLoss = 0; // Reset accumulated losses
     martingaleActive = false;
     maxStakeLimit = (initialAccountBalance * (10 / 100)); // 10% of initial balance max
 
@@ -1076,10 +1168,11 @@ function setAccData(accData) {
         initialStakeDisplay = `$ ${Number(nextTradeStake).toFixed(2)} (includes $${lossAmount.toFixed(2)} loss recovery)`;
     }
     setAccountInfo("nextTradeStake", initialStakeDisplay);
-    console.log(`🎯 Martingale System Initialized:`);
+    console.log(`🎯 Cumulative Loss Recovery Martingale System Initialized:`);
     console.log(`   Base Stake: $${baseStakeAmount.toFixed(2)}`);
     console.log(`   Max Stake Limit: $${maxStakeLimit.toFixed(2)} (10% of balance)`);
     console.log(`   Max Consecutive Losses: ${maxConsecutiveLosses}`);
+    console.log(`   Recovery Formula: Next Stake = Total Accumulated Losses × 4`);
 
     // Calculate and set target profit per session (1% of account balance)
     targetProfitPerSession = (initialAccountBalance * (1 / 100)).toFixed(2);
@@ -1140,15 +1233,23 @@ function webSocketFunctions(ws) {
                 console.log("Account balance:", wsResponse.authorize.balance);
                 setAccData(wsResponse.authorize);
                 
-                // Start market analysis after authentication
-                if (!marketAnalysisComplete) {
-                    console.log('🔄 Starting market history analysis...');
-                    // Request history for all markets with proper delays
-                    marketArray2.forEach((market, index) => {
-                        setTimeout(() => {
-                            requestMarketHistory(market.value, ws);
-                        }, (index + 1) * 1000); // 1 second delay between requests
-                    });
+                if (tradingMode === "analyzing") {
+                    // Start market analysis after authentication
+                    if (!marketAnalysisComplete) {
+                        console.log('🔄 Starting market history analysis...');
+                        // Request history for all markets with proper delays
+                        marketArray2.forEach((market, index) => {
+                            setTimeout(() => {
+                                requestMarketHistory(market.value, ws);
+                            }, (index + 1) * 1000); // 1 second delay between requests
+                        });
+                    }
+                } else if (tradingMode === "expansion") {
+                    // Skip market analysis and start trading immediately
+                    console.log('⚡ Expansion mode: Skipping market analysis, starting trading...');
+                    setTimeout(() => {
+                        initializeDualTradingSystem();
+                    }, 2000);
                 }
             }
         }
@@ -1225,9 +1326,15 @@ function webSocketFunctions(ws) {
             if (waitingForTrigger) {
                 console.log(`📊 Tick: ${currentPrice}, Last digit: ${lastDigit}, WaitingForTrigger: ${waitingForTrigger}`);
                 
-                // TRIGGER: Execute trades when last digit is 5
-                if (lastDigit === 5) {
-                    console.log('🎯 TRIGGER! Last digit is 5 - Executing dual trades!');
+                if (tradingMode === "analyzing") {
+                    // TRIGGER: Execute trades when last digit is 5 (analyzing mode)
+                    if (lastDigit === 5) {
+                        console.log('🎯 TRIGGER! Last digit is 5 - Executing dual trades!');
+                        executeDualTrades();
+                    }
+                } else if (tradingMode === "expansion") {
+                    // TRIGGER: Execute trades immediately on any tick (expansion mode)
+                    console.log('⚡ EXPANSION TRIGGER! Executing dual trades immediately!');
                     executeDualTrades();
                 }
             } else {
