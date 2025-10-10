@@ -33,26 +33,23 @@
               </div>
             </div>
             <div class="form-field">
-              <div class="form-title">Target Profit :</div>
+              <div class="form-title">Auto run :</div>
               <div class="form-element">
-                <input
-                  type="text"
-                  id="target_profit"
-                  class="form-control"
-                  value=""
-                />
+                <select class="form-control" id="auto_run">
+                  <option value="true">True</option>
+                  <option value="false" selected>False</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-field" id="auto_run_status" style="display: none;">
+              <div class="alert alert-info" style="margin: 0; padding: 10px; font-size: 12px;">
+                🤖 Auto-run is enabled. Bot will start automatically on page load.
               </div>
             </div>
             <div class="form-field">
-              <div class="form-title">Initial Stake :</div>
-              <div class="form-element">
-                <input
-                  type="text"
-                  id="initial_stake"
-                  class="form-control"
-                  value=""
-                />
-              </div>
+              <button class="btn btn-default btn-block" id="startBot">
+                Start Bot
+              </button>
             </div>
             <div class="form-field">
               <button class="btn btn-default btn-block" id="resetBot">
@@ -135,6 +132,22 @@
         </div>
       </div>
     </div> -->
+
+    <div class="container" id="analysis-results" style="text-align: center; display: none;">
+      <div class="row">
+        <div class="col-md-12 p-20">
+          <div style="border-radius: 5px;margin-bottom: 10px;">
+            <h4 style="color: #ffffff;margin-bottom: 15px;">📊 Market Analysis Results (Digit "4" Frequency)</h4>
+            <div id="analysis-content">
+              <!-- Analysis results will be inserted here dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    
+
 
     <div class="container" style="text-align: center">
       <div class="row">
