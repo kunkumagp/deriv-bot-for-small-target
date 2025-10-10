@@ -17,7 +17,7 @@ let userTokenByUrl = null,
     marketHistoryData = {},
     analysisProgress = 0,
     totalMarketsToAnalyze = 0,
-    martingaleMultiplyr = 4, // Multiplier for Martingale recovery
+    martingaleMultiplyr = 5, // Multiplier for Martingale recovery
     tradingMode = "analyzing", // "analyzing" or "expansion"
     // Dual Trading System Variables
     tradingActive = false,
@@ -1149,9 +1149,21 @@ function setAccData(accData) {
         const lossAmount = Number(carriedOverLoss);
         console.log(`🔄 Found carried over loss from previous session: $${lossAmount.toFixed(2)}`);
         
-        // Add the carried over loss to the base stake
-        currentStakeAmount = baseStakeAmount + lossAmount;
-        console.log(`💰 Adjusting stake: Base $${baseStakeAmount.toFixed(2)} + Loss Recovery $${lossAmount.toFixed(2)} = $${currentStakeAmount.toFixed(2)}`);
+        // Apply Martingale system: Calculate stake to recover all accumulated losses
+        totalAccumulatedLoss = lossAmount; // Set the accumulated loss amount
+        const requiredStakePerTrade = totalAccumulatedLoss * martingaleMultiplyr; // Use 4x multiplier
+        
+        // Apply safety limit - don't exceed maxStakeLimit
+        if (requiredStakePerTrade <= maxStakeLimit) {
+            currentStakeAmount = requiredStakePerTrade;
+            console.log(`💰 Martingale Recovery: Loss $${lossAmount.toFixed(2)} × ${martingaleMultiplyr} = $${currentStakeAmount.toFixed(2)}`);
+        } else {
+            currentStakeAmount = maxStakeLimit;
+            console.log(`⚠️ Martingale stake $${requiredStakePerTrade.toFixed(2)} exceeds limit, capping at $${maxStakeLimit.toFixed(2)}`);
+        }
+        
+        martingaleActive = true;
+        consecutiveLosses = 1; // At least one loss to trigger this
         
         // Clear the carried over loss from localStorage since we're using it now
         localStorage.removeItem('carriedOverLoss');
@@ -1163,9 +1175,9 @@ function setAccData(accData) {
     
     // Display stake with loss recovery info if applicable
     let initialStakeDisplay = `$ ${Number(nextTradeStake).toFixed(2)}`;
-    if (carriedOverLoss && Number(carriedOverLoss) > 0) {
-        const lossAmount = Number(carriedOverLoss);
-        initialStakeDisplay = `$ ${Number(nextTradeStake).toFixed(2)} (includes $${lossAmount.toFixed(2)} loss recovery)`;
+    if (martingaleActive && totalAccumulatedLoss > 0) {
+        const recoveryMultiplier = (currentStakeAmount / baseStakeAmount).toFixed(1);
+        initialStakeDisplay = `$ ${Number(nextTradeStake).toFixed(2)} 🔥 (${recoveryMultiplier}x Martingale recovery for $${totalAccumulatedLoss.toFixed(2)} loss)`;
     }
     setAccountInfo("nextTradeStake", initialStakeDisplay);
     console.log(`🎯 Cumulative Loss Recovery Martingale System Initialized:`);
