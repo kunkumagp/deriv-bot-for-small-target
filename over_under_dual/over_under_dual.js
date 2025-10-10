@@ -18,13 +18,20 @@ let userTokenByUrl = null,
     totalMarketsToAnalyze = 0,
     // Dual Trading System Variables
     tradingActive = false,
+    // Martingale System Variables
+    baseStakeAmount = 0,
+    currentStakeAmount = 0,
+    martingaleActive = false,
+    consecutiveLosses = 0,
+    maxStakeLimit = 0, // Will be set to 10% of initial balance
+    maxConsecutiveLosses = 5, // Stop Martingale after 5 consecutive losses
     proposalsReady = false,
     underFourProposal = null,
     overFiveProposal = null,
     tickSubscriptionActive = false,
     waitingForTrigger = false,
     activeTrades = [],
-    tickDuration = 5,
+    tickDuration = 1,
     tradingCycleCount = 0,
     // Dual trade pair tracking
     currentDualTradePair = {
@@ -118,14 +125,24 @@ window.addEventListener('load', function() {
         // Small delay to ensure all elements are loaded
         setTimeout(() => {
             console.log('Auto-starting bot because auto_run is enabled...');
-            startBot();
+            startBot(); // This will automatically change button to "Stop Bot"
         }, 1000);
     }
 });
 
-startBotButton.addEventListener('click', startBot);
+startBotButton.addEventListener('click', toggleBot);
 resetBotButton.addEventListener('click', resetBot);
 reStartBotButton.addEventListener('click', reStartBot);
+
+function toggleBot() {
+    if (tradingActive) {
+        // Bot is currently running, so stop it
+        stopBot();
+    } else {
+        // Bot is currently stopped, so start it
+        startBot();
+    }
+}
 
 function startBot() {
     console.log('🚀 Starting bot...');
@@ -134,8 +151,37 @@ function startBot() {
     // Set trading as active
     tradingActive = true;
     
+    // Update button text to "Stop Bot"
+    startBotButton.textContent = "Stop Bot";
+    startBotButton.className = "btn btn-danger btn-block"; // Change to red color
+    
     // Start market analysis before trading
     analyzeAllMarkets();
+}
+
+function stopBot() {
+    console.log('🛑 Stopping bot...');
+    
+    // Stop all trading activities
+    tradingActive = false;
+    proposalsReady = false;
+    underFourProposal = null;
+    overFiveProposal = null;
+    tickSubscriptionActive = false;
+    waitingForTrigger = false;
+    
+    // Close WebSocket if open
+    if (webSocket && webSocket.readyState === WebSocket.OPEN) {
+        webSocket.close();
+        webSocket = null;
+    }
+    
+    // Update button text back to "Start Bot"
+    startBotButton.textContent = "Start Bot";
+    startBotButton.className = "btn btn-default btn-block"; // Change back to default color
+    
+    setFlashNotification("Bot stopped successfully", 3000);
+    console.log('✅ Bot stopped');
 }
 
 // Market Analysis Functions
@@ -346,6 +392,29 @@ function processMarketAnalysis() {
 }
 
 // Dual Trading System Functions
+function isWebSocketReady() {
+    return webSocket && webSocket.readyState === WebSocket.OPEN;
+}
+
+function ensureWebSocketConnection(callback, maxRetries = 5) {
+    let retries = 0;
+    
+    function checkConnection() {
+        if (isWebSocketReady()) {
+            callback();
+        } else if (retries < maxRetries) {
+            retries++;
+            console.log(`⚠️ WebSocket not ready, retry ${retries}/${maxRetries}...`);
+            setTimeout(checkConnection, 1000);
+        } else {
+            console.error('❌ WebSocket connection failed after max retries');
+            setFlashNotification("WebSocket connection failed. Please restart the bot.", 5000);
+        }
+    }
+    
+    checkConnection();
+}
+
 function initializeDualTradingSystem() {
     console.log('🎯 Initializing Dual Trading System...');
     setFlashNotification("Preparing dual trades (Under 4 & Over 5)...", 3000);
@@ -354,19 +423,42 @@ function initializeDualTradingSystem() {
     proposalsReady = false;
     waitingForTrigger = false;
     
-    // Step 1: Prepare trade proposals
-    prepareDualTradeProposals();
+    // Ensure WebSocket is ready before proceeding
+    ensureWebSocketConnection(() => {
+        console.log('✅ WebSocket ready, preparing trade proposals...');
+        prepareDualTradeProposals();
+    });
 }
 
 function prepareDualTradeProposals() {
     console.log('📋 Preparing dual trade proposals...');
     
+    // Check if WebSocket is ready before sending
+    if (!isWebSocketReady()) {
+        console.log('⚠️ WebSocket not ready, retrying in 1 second...');
+        setTimeout(() => {
+            prepareDualTradeProposals();
+        }, 1000);
+        return;
+    }
+    
     const stake = Number(nextTradeStake);
+    
+    // Ensure stake meets minimum requirement of $0.35
+    if (stake < 0.35) {
+        console.log(`⚠️ Stake ${stake} is below minimum, adjusting to $0.35`);
+        nextTradeStake = "0.35";
+        currentStakeAmount = 0.35;
+        baseStakeAmount = 0.35;
+        setAccountInfo("nextTradeStake", `$ 0.35`);
+    }
+    
+    const finalStake = Number(nextTradeStake);
     
     // Under 4 Proposal
     const underFourProposalRequest = {
         proposal: 1,
-        amount: stake,
+        amount: finalStake,
         basis: "stake",
         contract_type: "DIGITUNDER",
         symbol: market,
@@ -379,7 +471,7 @@ function prepareDualTradeProposals() {
     // Over 5 Proposal  
     const overFiveProposalRequest = {
         proposal: 1,
-        amount: stake,
+        amount: finalStake,
         basis: "stake",
         contract_type: "DIGITOVER", 
         symbol: market,
@@ -391,6 +483,7 @@ function prepareDualTradeProposals() {
     
     console.log('📤 Sending Under 4 proposal request...');
     console.log('Request details:', JSON.stringify(underFourProposalRequest));
+    console.log(`🎯 Current market value: "${market}"`);
     webSocket.send(JSON.stringify(underFourProposalRequest));
     
     setTimeout(() => {
@@ -401,19 +494,46 @@ function prepareDualTradeProposals() {
 }
 
 function startTickMonitoring() {
-    if (tickSubscriptionActive) return;
+    if (tickSubscriptionActive) {
+        console.log('⚠️ Tick monitoring already active, skipping...');
+        return;
+    }
     
     console.log('👀 Starting real-time tick monitoring for trigger detection...');
-    setFlashNotification("Monitoring market ticks... Waiting for last digit = 4", 0);
+    console.log(`📊 Target market: ${market}`);
+    setFlashNotification("Monitoring market ticks... Waiting for last digit = 5", 0);
+    
+    // Check if WebSocket is ready before sending
+    if (!isWebSocketReady()) {
+        console.log('⚠️ WebSocket not ready for tick monitoring, retrying in 1 second...');
+        setTimeout(() => {
+            startTickMonitoring();
+        }, 1000);
+        return;
+    }
     
     const tickSubscription = {
         ticks: market,
         subscribe: 1
     };
     
+    console.log('📡 Sending tick subscription request:', tickSubscription);
     webSocket.send(JSON.stringify(tickSubscription));
     tickSubscriptionActive = true;
     waitingForTrigger = true;
+    console.log('✅ Tick subscription sent, waiting for tick data...');
+    console.log(`🎯 waitingForTrigger set to: ${waitingForTrigger}`);
+    
+    // Add a timeout to detect if no ticks are received
+    setTimeout(() => {
+        if (waitingForTrigger && tickSubscriptionActive) {
+            console.log('⚠️ No ticks received after 30 seconds. Checking connection...');
+            console.log('WebSocket state:', webSocket.readyState);
+            console.log('WebSocket ready:', isWebSocketReady());
+            console.log('Market:', market);
+            console.log('Waiting for trigger:', waitingForTrigger);
+        }
+    }, 30000); // 30 second timeout
 }
 
 function executeDualTrades() {
@@ -422,8 +542,15 @@ function executeDualTrades() {
         return;
     }
     
+    // Check if WebSocket is ready before executing trades
+    if (!isWebSocketReady()) {
+        console.error('❌ WebSocket not ready for trade execution!');
+        setFlashNotification("WebSocket connection lost! Cannot execute trades.", 5000);
+        return;
+    }
+    
     console.log('🚀 TRIGGER DETECTED! Executing dual trades instantly...');
-    setFlashNotification("🚀 DUAL TRADES EXECUTING! Last digit = 4", 3000);
+    setFlashNotification("🚀 DUAL TRADES EXECUTING! Last digit = 5", 3000);
     
     waitingForTrigger = false;
     
@@ -488,18 +615,35 @@ function handleTradeOutcome(contractResult) {
     if (currentDualTradePair.underTrade && currentDualTradePair.overTrade && !currentDualTradePair.isComplete) {
         currentDualTradePair.isComplete = true;
         
-        // Calculate dual trade pair results
+        // Calculate dual trade pair results correctly for dual trading strategy
         const underProfit = currentDualTradePair.underTrade.profit;
         const overProfit = currentDualTradePair.overTrade.profit;
-        const totalStake = Number(nextTradeStake) * 2; // Two trades
-        const totalProfit = underProfit + overProfit;
-        const netResult = totalProfit; // This is the net gain/loss after stake is already deducted
+        const totalStake = Number(nextTradeStake) * 2; // Two trades stake
+        
+        // In dual trading: we stake on both trades, but only one can win
+        // The "profit" from API is already net (payout - individual stake)
+        // So we need to calculate the true balance change differently
+        
+        // Find the winning trade (the one with positive profit)
+        const winningTradeProfit = Math.max(underProfit, overProfit);
+        const losingTradeProfit = Math.min(underProfit, overProfit); // This will be negative
+        
+        // Calculate actual balance change: (winning payout + winning stake) - total stake
+        // Since API profit = payout - stake, then payout = profit + stake
+        let balanceChange;
+        if (winningTradeProfit > 0) {
+            const winningPayout = winningTradeProfit + Number(nextTradeStake); // Recover the payout
+            balanceChange = winningPayout - totalStake; // Total payout minus total stake
+        } else {
+            // Both trades lost (very rare but possible)
+            balanceChange = underProfit + overProfit; // Both are negative, so this is total loss
+        }
         
         console.log(`🎯 DUAL TRADE PAIR COMPLETE:`);
-        console.log(`   Under 4 Trade: $${underProfit}`);
-        console.log(`   Over 5 Trade: $${overProfit}`);
+        console.log(`   Under 4 Trade: $${underProfit} (${underProfit > 0 ? 'WON' : 'LOST'})`);
+        console.log(`   Over 5 Trade: $${overProfit} (${overProfit > 0 ? 'WON' : 'LOST'})`);
         console.log(`   Total Stake: $${totalStake}`);
-        console.log(`   Net Result: $${netResult}`);
+        console.log(`   Balance Change: $${balanceChange.toFixed(2)}`);
         
         // Update statistics correctly for dual trading
         totalTradeCount += 2; // Count both trades
@@ -517,19 +661,88 @@ function handleTradeOutcome(contractResult) {
         winTradeCount += winCount;
         lossTradeCount += lossCount;
         
-        // Update profit/loss amounts
-        if (netResult > 0) {
-            currentProfitAmount += netResult;
-            console.log(`✅ Dual trade pair WON: +$${netResult}`);
-        } else if (netResult < 0) {
-            currentLossAmount += Math.abs(netResult);
-            console.log(`❌ Dual trade pair LOST: -$${Math.abs(netResult)}`);
+        // Update profit/loss amounts based on balance change
+        if (balanceChange > 0) {
+            currentProfitAmount += balanceChange;
+            console.log(`✅ Dual trade pair NET GAIN: +$${balanceChange.toFixed(2)}`);
+        } else if (balanceChange < 0) {
+            const lossAmountPositive = Math.abs(balanceChange);
+            currentLossAmount += lossAmountPositive;
+            console.log(`❌ Dual trade pair NET LOSS: -$${lossAmountPositive.toFixed(2)}`);
+            
+            // Store the loss amount in localStorage for recovery in next session
+            const existingLoss = localStorage.getItem('carriedOverLoss') || '0';
+            const totalCarriedLoss = Number(existingLoss) + lossAmountPositive;
+            localStorage.setItem('carriedOverLoss', totalCarriedLoss.toFixed(2));
+            console.log(`💾 Loss stored for recovery: $${lossAmountPositive.toFixed(2)} (Total carried: $${totalCarriedLoss.toFixed(2)})`);
         } else {
             console.log(`⚖️ Dual trade pair BROKE EVEN: $0.00`);
         }
         
+        // Apply Martingale Strategy for dual trading
+        const bothTradesLost = (underProfit <= 0 && overProfit <= 0);
+        
+        if (bothTradesLost) {
+            // Both trades lost - apply Martingale (double the stake)
+            consecutiveLosses++;
+            
+            // Check if we've reached maximum consecutive losses
+            if (consecutiveLosses > maxConsecutiveLosses) {
+                // Reset to base stake instead of continuing Martingale
+                currentStakeAmount = baseStakeAmount;
+                consecutiveLosses = 0;
+                martingaleActive = false;
+                console.log(`🛑 MAXIMUM CONSECUTIVE LOSSES REACHED - Martingale Reset!`);
+                console.log(`   Resetting from Martingale back to base stake: $${baseStakeAmount.toFixed(2)}`);
+                console.log(`   ⚠️  Safety mechanism activated after ${maxConsecutiveLosses} consecutive losses`);
+            } else {
+                const proposedStake = baseStakeAmount * Math.pow(2, consecutiveLosses);
+                
+                // Apply safety limit - don't exceed maxStakeLimit
+                if (proposedStake <= maxStakeLimit) {
+                    currentStakeAmount = proposedStake;
+                    martingaleActive = true;
+                    console.log(`🔴 BOTH TRADES LOST - Martingale Applied!`);
+                    console.log(`   Consecutive Losses: ${consecutiveLosses}/${maxConsecutiveLosses}`);
+                    console.log(`   Next Stake: $${currentStakeAmount.toFixed(2)} (${Math.pow(2, consecutiveLosses)}x base)`);
+                } else {
+                    currentStakeAmount = maxStakeLimit;
+                    martingaleActive = true;
+                    console.log(`🔴 BOTH TRADES LOST - Martingale CAPPED at Maximum!`);
+                    console.log(`   Consecutive Losses: ${consecutiveLosses}/${maxConsecutiveLosses}`);
+                    console.log(`   Next Stake: $${currentStakeAmount.toFixed(2)} (MAX LIMIT REACHED)`);
+                    console.log(`   ⚠️  Would have been: $${proposedStake.toFixed(2)} but limited to $${maxStakeLimit.toFixed(2)}`);
+                }
+            }
+        } else {
+            // At least one trade won - reset Martingale
+            if (martingaleActive) {
+                console.log(`🟢 TRADE WON - Martingale Reset!`);
+                console.log(`   Resetting from $${currentStakeAmount.toFixed(2)} back to base $${baseStakeAmount.toFixed(2)}`);
+            }
+            consecutiveLosses = 0;
+            currentStakeAmount = baseStakeAmount;
+            martingaleActive = false;
+        }
+        
+        // Update next trade stake for the next cycle
+        nextTradeStake = currentStakeAmount.toFixed(2);
+        
+        // Display stake with Martingale status and loss recovery info
+        let stakeDisplay = `$ ${Number(nextTradeStake).toFixed(2)}`;
+        if (martingaleActive) {
+            stakeDisplay += ` 🔥 (${Math.pow(2, consecutiveLosses)}x)`;
+        }
+        
+        // Check if there's still loss recovery pending
+        const pendingLoss = localStorage.getItem('carriedOverLoss');
+        if (pendingLoss && Number(pendingLoss) > 0) {
+            stakeDisplay += ` 🔄 (+$${Number(pendingLoss).toFixed(2)} recovery)`;
+        }
+        
+        setAccountInfo("nextTradeStake", stakeDisplay);
+        
         // Update account balance correctly
-        // Account balance calculation: Initial balance + all net profits/losses
         updatedAccountBalance = initialAccountBalance + currentProfitAmount - currentLossAmount;
         
         console.log(`💰 Updated Account Balance: $${updatedAccountBalance.toFixed(2)}`);
@@ -537,22 +750,14 @@ function handleTradeOutcome(contractResult) {
         // Update UI with correct statistics
         updateTradeStatistics();
         
-        // Reset dual trade pair for next cycle
-        currentDualTradePair = {
-            underTrade: null,
-            overTrade: null,
-            isComplete: false
-        };
+        // Check if both trades from the pair are complete BEFORE resetting
+        checkDualTradeCompletion();
     }
-    
-    // Check if both trades from the pair are complete
-    checkDualTradeCompletion();
 }
 
 function checkDualTradeCompletion() {
-    // Logic to check if both Under 4 and Over 5 trades are complete
-    // If both complete, prepare for next round
-    if (activeTrades.length === 0) {
+    // Check if dual trade pair is complete (both trades finished)
+    if (currentDualTradePair.isComplete) {
         tradingCycleCount++;
         console.log(`🔄 Dual trade cycle #${tradingCycleCount} complete.`);
         
@@ -560,26 +765,29 @@ function checkDualTradeCompletion() {
         const autoRunValue = localStorage.getItem('auto_run');
         
         if (autoRunValue === 'true' && tradingActive) {
-            console.log(`🔁 Auto-run enabled: Starting cycle #${tradingCycleCount + 1}...`);
-            setFlashNotification(`Cycle #${tradingCycleCount} complete. Starting new analysis...`, 3000);
+            console.log(`🔁 Auto-run enabled: Reloading page in 5 seconds for fresh start...`);
+            setFlashNotification(`Trade complete! Reloading page in 5 seconds for next cycle...`, 5000);
             
-            // Reset trading state
-            proposalsReady = false;
-            underFourProposal = null;
-            overFiveProposal = null;
-            tickSubscriptionActive = false;
-            waitingForTrigger = false;
-            
-            // Wait a bit then restart the entire process with new market analysis
+            // Reload the page after 5 seconds for a completely fresh start
             setTimeout(() => {
-                if (tradingActive) {
-                    console.log(`🔍 Starting fresh market analysis for cycle #${tradingCycleCount + 1}...`);
-                    analyzeAllMarkets();
-                }
-            }, 5000); // 5 second delay between cycles
+                console.log(`� Reloading page for cycle #${tradingCycleCount + 1}...`);
+                location.reload();
+            }, 5000);
         } else {
             console.log('⏸️ Auto-run disabled or trading stopped. Cycle complete.');
             setFlashNotification(`Trading cycle #${tradingCycleCount} complete. Auto-run disabled.`, 3000);
+            
+            // Stop trading and reset button state
+            tradingActive = false;
+            startBotButton.textContent = "Start Bot";
+            startBotButton.className = "btn btn-default btn-block";
+            
+            // Reset dual trade pair even if auto-run is disabled
+            currentDualTradePair = {
+                underTrade: null,
+                overTrade: null,
+                isComplete: false
+            };
         }
     }
 }
@@ -711,7 +919,7 @@ function displayDualTradeHeader() {
             <div style="text-align: center;">
                 <h4 style="margin: 0; color: #856404;">🚀 DUAL TRADE EXECUTED</h4>
                 <div style="margin-top: 5px;">
-                    <strong>Trigger:</strong> Last digit = 4 | <strong>Market:</strong> ${market}
+                    <strong>Trigger:</strong> Last digit = 5 | <strong>Market:</strong> ${market}
                 </div>
                 <div style="margin-top: 5px; font-size: 12px; color: #666;">
                     ${timestamp}
@@ -773,11 +981,22 @@ function resetBot() {
     marketHistoryData = {};
     analysisProgress = 0;
     
+    // Clear carried over losses when manually resetting
+    const carriedLoss = localStorage.getItem('carriedOverLoss');
+    if (carriedLoss && Number(carriedLoss) > 0) {
+        localStorage.removeItem('carriedOverLoss');
+        console.log(`🗑️ Cleared carried over loss: $${Number(carriedLoss).toFixed(2)}`);
+    }
+    
     // Close WebSocket if open
     if (webSocket && webSocket.readyState === WebSocket.OPEN) {
         webSocket.close();
         webSocket = null;
     }
+    
+    // Reset button state
+    startBotButton.textContent = "Start Bot";
+    startBotButton.className = "btn btn-default btn-block";
     
     setFlashNotification("Bot reset successfully", 3000);
     console.log('✅ Bot reset complete');
@@ -786,13 +1005,13 @@ function resetBot() {
 function reStartBot() {
     console.log('🔄 Restarting bot...');
     
-    // First reset everything
+    // First reset everything (this will set button back to "Start Bot")
     resetBot();
     
     // Wait a moment then restart
     setTimeout(() => {
         console.log('🚀 Starting fresh bot session...');
-        startBot();
+        startBot(); // This will change button to "Stop Bot"
     }, 2000);
 }
 
@@ -815,12 +1034,52 @@ function setAccData(accData) {
 
     // Calculate and set initial amount per trade (0.35% of account balance)
     initialAmountPerTrade = (initialAccountBalance * (0.35 / 100)).toFixed(2);
+    
+    // Ensure minimum stake of $0.35 is met
+    if (Number(initialAmountPerTrade) < 0.35) {
+        initialAmountPerTrade = "0.35";
+        console.log(`⚠️ Calculated stake was too low, using minimum stake: $0.35`);
+    }
+    
     setAccountInfo("initialAmountPerTrade", `$ ${Number(initialAmountPerTrade).toFixed(2)}`);
     localStorage.setItem('initialAmountPerTrade', initialAmountPerTrade);
 
-    // Set next trade stake (initially same as initial amount per trade)
-    nextTradeStake = initialAmountPerTrade;
-    setAccountInfo("nextTradeStake", `$ ${Number(nextTradeStake).toFixed(2)}`);
+    // Initialize Martingale system
+    baseStakeAmount = Number(initialAmountPerTrade);
+    currentStakeAmount = baseStakeAmount;
+    consecutiveLosses = 0;
+    martingaleActive = false;
+    maxStakeLimit = (initialAccountBalance * (10 / 100)); // 10% of initial balance max
+
+    // Check for carried over losses from previous sessions
+    const carriedOverLoss = localStorage.getItem('carriedOverLoss');
+    if (carriedOverLoss && Number(carriedOverLoss) > 0) {
+        const lossAmount = Number(carriedOverLoss);
+        console.log(`🔄 Found carried over loss from previous session: $${lossAmount.toFixed(2)}`);
+        
+        // Add the carried over loss to the base stake
+        currentStakeAmount = baseStakeAmount + lossAmount;
+        console.log(`💰 Adjusting stake: Base $${baseStakeAmount.toFixed(2)} + Loss Recovery $${lossAmount.toFixed(2)} = $${currentStakeAmount.toFixed(2)}`);
+        
+        // Clear the carried over loss from localStorage since we're using it now
+        localStorage.removeItem('carriedOverLoss');
+        console.log('✅ Carried over loss cleared from localStorage');
+    }
+
+    // Set next trade stake (with potential loss recovery added)
+    nextTradeStake = currentStakeAmount.toFixed(2);
+    
+    // Display stake with loss recovery info if applicable
+    let initialStakeDisplay = `$ ${Number(nextTradeStake).toFixed(2)}`;
+    if (carriedOverLoss && Number(carriedOverLoss) > 0) {
+        const lossAmount = Number(carriedOverLoss);
+        initialStakeDisplay = `$ ${Number(nextTradeStake).toFixed(2)} (includes $${lossAmount.toFixed(2)} loss recovery)`;
+    }
+    setAccountInfo("nextTradeStake", initialStakeDisplay);
+    console.log(`🎯 Martingale System Initialized:`);
+    console.log(`   Base Stake: $${baseStakeAmount.toFixed(2)}`);
+    console.log(`   Max Stake Limit: $${maxStakeLimit.toFixed(2)} (10% of balance)`);
+    console.log(`   Max Consecutive Losses: ${maxConsecutiveLosses}`);
 
     // Calculate and set target profit per session (1% of account balance)
     targetProfitPerSession = (initialAccountBalance * (1 / 100)).toFixed(2);
@@ -860,8 +1119,19 @@ function webSocketFunctions(ws) {
     };
 
     ws.onmessage = function(event) {
-        // console.log('WebSocket message received:', event.data);
         const wsResponse = JSON.parse(event.data);
+        
+        // Debug: Log tick messages specifically
+        if (wsResponse.msg_type === "tick") {
+            console.log('📈 Received tick data:', wsResponse.tick);
+        } else if (wsResponse.msg_type === "ticks") {
+            console.log('📊 Received tick subscription confirmation:', wsResponse);
+        } else if (wsResponse.error) {
+            console.error('❌ WebSocket error received:', wsResponse.error);
+            if (wsResponse.echo_req && wsResponse.echo_req.ticks) {
+                console.error('🚫 Tick subscription failed for:', wsResponse.echo_req.ticks);
+            }
+        }
         
         // Handle authentication response
         if (wsResponse.msg_type === "authorize") {
@@ -906,19 +1176,29 @@ function webSocketFunctions(ws) {
             
             if (contractType === "DIGITUNDER" && wsResponse.echo_req.barrier === "4") {
                 underFourProposal = proposal;
-                console.log(`✅ Under 4 proposal ready - Payout: $${proposal.payout}, Ask Price: $${proposal.ask_price}`);
+                if (proposal && proposal.payout) {
+                    console.log(`✅ Under 4 proposal ready - Payout: $${proposal.payout}, Ask Price: $${proposal.ask_price}`);
+                } else {
+                    console.error(`❌ Invalid Under 4 proposal received:`, proposal);
+                    return;
+                }
             }
             
             if (contractType === "DIGITOVER" && wsResponse.echo_req.barrier === "5") {
                 overFiveProposal = proposal;
-                console.log(`✅ Over 5 proposal ready - Payout: $${proposal.payout}, Ask Price: $${proposal.ask_price}`);
+                if (proposal && proposal.payout) {
+                    console.log(`✅ Over 5 proposal ready - Payout: $${proposal.payout}, Ask Price: $${proposal.ask_price}`);
+                } else {
+                    console.error(`❌ Invalid Over 5 proposal received:`, proposal);
+                    return;
+                }
             }
             
             // Check if both proposals are ready
             if (underFourProposal && overFiveProposal) {
                 proposalsReady = true;
                 console.log('🎯 Both proposals ready! Starting tick monitoring...');
-                setFlashNotification("Proposals ready! Monitoring for trigger (last digit = 4)...", 0);
+                setFlashNotification("Proposals ready! Monitoring for trigger (last digit = 5)...", 0);
                 startTickMonitoring();
             }
         }
@@ -926,17 +1206,32 @@ function webSocketFunctions(ws) {
         // Handle real-time ticks
         if (wsResponse.msg_type === "tick") {
             const tick = wsResponse.tick;
-            const currentPrice = tick.quote;
+            
+            // Extract price - try different properties based on tick structure
+            let currentPrice;
+            if (tick.quote) {
+                currentPrice = tick.quote;
+            } else if (tick.ask) {
+                currentPrice = tick.ask;
+            } else if (tick.bid) {
+                currentPrice = tick.bid;
+            } else {
+                console.log('⚠️ Unknown tick structure:', tick);
+                return;
+            }
+            
             const lastDigit = Number(String(currentPrice).slice(-1));
             
             if (waitingForTrigger) {
-                console.log(`📊 Tick: ${currentPrice}, Last digit: ${lastDigit}`);
+                console.log(`📊 Tick: ${currentPrice}, Last digit: ${lastDigit}, WaitingForTrigger: ${waitingForTrigger}`);
                 
-                // TRIGGER: Execute trades when last digit is 4
-                if (lastDigit === 4) {
-                    console.log('🎯 TRIGGER! Last digit is 4 - Executing dual trades!');
+                // TRIGGER: Execute trades when last digit is 5
+                if (lastDigit === 5) {
+                    console.log('🎯 TRIGGER! Last digit is 5 - Executing dual trades!');
                     executeDualTrades();
                 }
+            } else {
+                console.log(`📊 Tick received but not waiting for trigger: ${currentPrice}, Last digit: ${lastDigit}`);
             }
         }
         
@@ -1040,6 +1335,34 @@ function webSocketFunctions(ws) {
                 
                 // Still count as processed to continue analysis
                 processMarketAnalysis();
+            }
+            
+            // Check if it's a proposal error due to minimum stake
+            if (wsResponse.echo_req && wsResponse.echo_req.proposal && 
+                wsResponse.error.message && wsResponse.error.message.includes("stake amount")) {
+                console.log(`⚠️ Proposal error - minimum stake issue: ${wsResponse.error.message}`);
+                
+                // Extract minimum stake from error message if available
+                const minStakeMatch = wsResponse.error.message.match(/(\d+\.\d+)/);
+                if (minStakeMatch) {
+                    const minStake = Number(minStakeMatch[1]);
+                    console.log(`💰 Adjusting stake to minimum required: $${minStake}`);
+                    
+                    // Update the stake and retry proposals
+                    nextTradeStake = minStake.toFixed(2);
+                    currentStakeAmount = minStake;
+                    baseStakeAmount = minStake;
+                    
+                    setAccountInfo("nextTradeStake", `$ ${Number(nextTradeStake).toFixed(2)}`);
+                    
+                    // Retry preparing proposals with the corrected stake
+                    setTimeout(() => {
+                        console.log('🔄 Retrying proposals with corrected stake...');
+                        prepareDualTradeProposals();
+                    }, 2000);
+                } else {
+                    setFlashNotification("Proposal failed due to stake requirements. Please check minimum stake.", 5000);
+                }
             }
         }
     };
