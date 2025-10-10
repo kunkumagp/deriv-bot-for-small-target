@@ -316,11 +316,12 @@ function startWebSocket(){
                                 localStorage.setItem("totalLostAmount",currentLossAmount );
                                 localStorage.setItem("lostCountInRow",lostCountInRow );
                                 stake = stake * 12;
-                                market = getRandomMarket(marketArray2, market);
+                                // market = getRandomMarket(marketArray2, market);
                                 // timeInterval = (getRandomNumber(60, 120) * 1000 );
 
                                 if(lostCountInRow >= 2){
-                                    timeInterval = (getRandomNumber(10, 30) * 1000 );
+                                    // timeInterval = (getRandomNumber(10, 30) * 1000 );
+                                    // timeInterval = (getRandomNumber(60, 120) * 1000 );
                                     setTimer(timeInterval);
                                     setTimeout(() => {
                                         // runScriptForTrade();
@@ -337,8 +338,6 @@ function startWebSocket(){
                                         runScriptForTrade();
                                     }, timeInterval);
                                 }
-
-                                
 
                             } else {
                                 localStorage.removeItem("currentLossAmount");
@@ -668,9 +667,9 @@ function placeDigitDifferTrade(lowestEntry) {
         stake = nextTradeStake || initialAmountPerTrade;
         stake = Number(stake);
         stake < 0.35 ? (stake = 0.35) : (stake = stake);
-        // if(currentProfitAmount > 0){
-        //     stake = stake + currentProfitAmount;
-        // }
+        if(currentProfitAmount > 0){
+            stake = stake + currentProfitAmount;
+        }
 
         // Create the trade request for Digit Differs
         tradeRequest = {
