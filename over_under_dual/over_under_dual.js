@@ -19,6 +19,7 @@ let userTokenByUrl = null,
     totalMarketsToAnalyze = 0,
     martingaleMultiplyr = 5, // Multiplier for Martingale recovery
     tradingMode = "analyzing", // "analyzing" or "expansion"
+    originalTradingMode = "analyzing", // Store original mode before auto-switch
     // Dual Trading System Variables
     tradingActive = false,
     // Martingale System Variables
@@ -105,11 +106,24 @@ if (savedAutoRun) {
 
 // Load trading_mode setting from localStorage
 const savedTradingMode = localStorage.getItem('trading_mode');
-if (savedTradingMode) {
+const wasAutoSwitched = localStorage.getItem('autoSwitchedToAnalyzing') === 'true';
+const savedOriginalMode = localStorage.getItem('originalTradingMode');
+
+if (wasAutoSwitched && savedOriginalMode) {
+    // Restore from auto-switch state
+    console.log(`🔄 Page reload: Restoring from auto-switched state`);
+    console.log(`   Current mode: analyzing (auto-switched)`);
+    console.log(`   Original mode: ${savedOriginalMode}`);
+    tradingModeSelectElement.value = "analyzing";
+    tradingMode = "analyzing";
+    originalTradingMode = savedOriginalMode;
+} else if (savedTradingMode) {
     tradingModeSelectElement.value = savedTradingMode;
     tradingMode = savedTradingMode;
+    originalTradingMode = savedTradingMode; // Store as original mode
 } else {
     tradingMode = "analyzing"; // Default mode
+    originalTradingMode = "analyzing"; // Store as original mode
 }
 
 // Update status indicator
@@ -135,7 +149,8 @@ autoRunSelectElement.addEventListener('change', function() {
 tradingModeSelectElement.addEventListener('change', function() {
     localStorage.setItem('trading_mode', this.value);
     tradingMode = this.value;
-    console.log(`🔄 Trading mode changed to: ${tradingMode}`);
+    originalTradingMode = this.value; // Update original mode when user manually changes it
+    console.log(`🔄 Trading mode changed to: ${tradingMode} (set as original mode)`);
 });
 
 // Auto-start bot if auto_run is true
@@ -167,6 +182,13 @@ function toggleBot() {
 function startBot() {
     console.log('🚀 Starting bot...');
     console.log(`🎯 Trading Mode: ${tradingMode.toUpperCase()}`);
+    
+    // Show auto-switch status if applicable
+    const wasAutoSwitched = localStorage.getItem('autoSwitchedToAnalyzing') === 'true';
+    if (wasAutoSwitched && originalTradingMode !== tradingMode) {
+        console.log(`🔄 Note: Mode was auto-switched from ${originalTradingMode.toUpperCase()} due to 4+ consecutive losses`);
+        console.log(`   Will restore to ${originalTradingMode.toUpperCase()} after next win`);
+    }
     
     // Set trading as active
     tradingActive = true;
@@ -756,6 +778,19 @@ function handleTradeOutcome(contractResult) {
             console.log(`   Total accumulated losses: $${totalAccumulatedLoss.toFixed(2)}`);
             console.log(`   Consecutive Losses: ${consecutiveLosses}/${maxConsecutiveLosses}`);
             
+            // Auto-switch to "analyzing" mode after 4 consecutive losses
+            if (consecutiveLosses >= 4 && tradingMode !== "analyzing") {
+                console.log(`🎯 AUTO-SWITCHING TO ANALYZING MODE after ${consecutiveLosses} consecutive losses!`);
+                console.log(`   📝 Storing original mode: "${originalTradingMode}" for restoration later`);
+                tradingMode = "analyzing";
+                tradingModeSelectElement.value = "analyzing";
+                // Store auto-switch info in localStorage for page reload recovery
+                localStorage.setItem('autoSwitchedToAnalyzing', 'true');
+                localStorage.setItem('originalTradingMode', originalTradingMode);
+                console.log(`   🔄 Trading mode temporarily changed from ${originalTradingMode} to analyzing for better precision`);
+                console.log(`   📊 Next trade will wait for last digit = 5 trigger`);
+            }
+            
             // Check if we've reached maximum consecutive losses
             if (consecutiveLosses > maxConsecutiveLosses) {
                 // Reset everything instead of continuing Martingale
@@ -797,6 +832,19 @@ function handleTradeOutcome(contractResult) {
                 console.log(`   Previous stake: $${currentStakeAmount.toFixed(2)}`);
                 console.log(`   Resetting to base stake: $${baseStakeAmount.toFixed(2)}`);
             }
+            
+            // Restore original trading mode if it was auto-switched
+            if (tradingMode === "analyzing" && originalTradingMode !== "analyzing") {
+                console.log(`🔄 RESTORING ORIGINAL TRADING MODE: ${originalTradingMode}`);
+                tradingMode = originalTradingMode;
+                tradingModeSelectElement.value = originalTradingMode;
+                localStorage.setItem('trading_mode', originalTradingMode);
+                // Clear auto-switch flags
+                localStorage.removeItem('autoSwitchedToAnalyzing');
+                localStorage.removeItem('originalTradingMode');
+                console.log(`   ✅ Trading mode restored from analyzing back to ${originalTradingMode}`);
+            }
+            
             consecutiveLosses = 0;
             totalAccumulatedLoss = 0; // Clear all accumulated losses
             currentStakeAmount = baseStakeAmount;
@@ -1059,6 +1107,17 @@ function resetBot() {
     consecutiveLosses = 0;
     totalAccumulatedLoss = 0;
     martingaleActive = false;
+    
+    // Restore original trading mode if it was auto-switched
+    if (tradingMode === "analyzing" && originalTradingMode !== "analyzing") {
+        console.log(`🔄 RESTORING ORIGINAL TRADING MODE on reset: ${originalTradingMode}`);
+        tradingMode = originalTradingMode;
+        tradingModeSelectElement.value = originalTradingMode;
+        localStorage.setItem('trading_mode', originalTradingMode);
+        // Clear auto-switch flags
+        localStorage.removeItem('autoSwitchedToAnalyzing');
+        localStorage.removeItem('originalTradingMode');
+    }
     
     // Reset dual trade pair tracking
     currentDualTradePair = {
