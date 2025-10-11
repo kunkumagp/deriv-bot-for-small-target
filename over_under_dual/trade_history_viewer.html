@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trade History Viewer - Deriv Bot</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #1e7e34;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .table-container {
+            overflow-x: auto;
+            max-height: 600px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+            white-space: nowrap;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .win { background-color: #d4edda; }
+        .loss { background-color: #f8d7da; }
+        .breakeven { background-color: #fff3cd; }
+        .martingale { font-weight: bold; color: #e83e8c; }
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-style: italic;
+        }
+        .filter-container {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .filter-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        select, input {
+            padding: 5px 10px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        label {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Trade History Viewer</h1>
+        
+        <div class="stats-grid" id="statsGrid">
+            <!-- Stats will be populated here -->
+        </div>
+        
+        <div class="controls">
+            <button class="btn-primary" onclick="loadTradeHistory()">🔄 Refresh Data</button>
+            <button class="btn-success" onclick="downloadCSV()">📥 Download CSV</button>
+            <button class="btn-danger" onclick="clearHistory()">🗑️ Clear History</button>
+            <button class="btn-primary" onclick="analyzeMartingale()">🔥 Martingale Analysis</button>
+            <button class="btn-primary" onclick="analyzeMarkets()">📈 Market Analysis</button>
+        </div>
+        
+        <div class="filter-container">
+            <div class="filter-row">
+                <label>Filter by Result:</label>
+                <select id="resultFilter" onchange="filterTable()">
+                    <option value="">All</option>
+                    <option value="WIN">Wins Only</option>
+                    <option value="LOSS">Losses Only</option>
+                    <option value="BREAKEVEN">Breakeven Only</option>
+                </select>
+                
+                <label>Market:</label>
+                <select id="marketFilter" onchange="filterTable()">
+                    <option value="">All Markets</option>
+                </select>
+                
+                <label>Trading Mode:</label>
+                <select id="modeFilter" onchange="filterTable()">
+                    <option value="">All Modes</option>
+                    <option value="analyzing">Analyzing</option>
+                    <option value="expansion">Expansion</option>
+                </select>
+                
+                <label>Martingale Only:</label>
+                <input type="checkbox" id="martingaleFilter" onchange="filterTable()">
+            </div>
+        </div>
+        
+        <div class="table-container">
+            <table id="historyTable">
+                <thead>
+                    <tr>
+                        <th>Date/Time</th>
+                        <th>Cycle</th>
+                        <th>Market</th>
+                        <th>Mode</th>
+                        <th>Stake/Trade</th>
+                        <th>Total Stake</th>
+                        <th>Under Profit</th>
+                        <th>Over Profit</th>
+                        <th>Net P&L</th>
+                        <th>Result</th>
+                        <th>Balance</th>
+                        <th>Martingale</th>
+                        <th>Consec. Losses</th>
+                        <th>Accum. Loss</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let tradeHistoryData = [];
+        let filteredData = [];
+
+        function loadTradeHistory() {
+            try {
+                const data = localStorage.getItem('tradeHistory');
+                tradeHistoryData = data ? JSON.parse(data) : [];
+                
+                if (tradeHistoryData.length === 0) {
+                    document.getElementById('historyTableBody').innerHTML = 
+                        '<tr><td colspan="14" class="no-data">No trade history data found. Start trading to see data here.</td></tr>';
+                    updateStats({});
+                    return;
+                }
+                
+                // Sort by timestamp (newest first)
+                tradeHistoryData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                
+                updateStats(calculateStats());
+                populateFilters();
+                filterTable();
+                
+                console.log(`📊 Loaded ${tradeHistoryData.length} trade records`);
+            } catch (error) {
+                console.error('Error loading trade history:', error);
+                alert('Error loading trade history data');
+            }
+        }
+
+        function calculateStats() {
+            if (tradeHistoryData.length === 0) return {};
+            
+            const totalTrades = tradeHistoryData.length;
+            const wins = tradeHistoryData.filter(t => t.result === 'WIN').length;
+            const losses = tradeHistoryData.filter(t => t.result === 'LOSS').length;
+            const winRate = ((wins / totalTrades) * 100).toFixed(2);
+            const totalPL = tradeHistoryData.reduce((sum, t) => sum + t.netProfitLoss, 0);
+            const avgPL = totalPL / totalTrades;
+            const martingaleTrades = tradeHistoryData.filter(t => t.martingaleActive).length;
+            
+            return {
+                totalTrades,
+                wins,
+                losses,
+                winRate,
+                totalPL,
+                avgPL,
+                martingaleTrades
+            };
+        }
+
+        function updateStats(stats) {
+            const statsGrid = document.getElementById('statsGrid');
+            
+            if (Object.keys(stats).length === 0) {
+                statsGrid.innerHTML = '<div class="stat-card"><div class="stat-value">0</div><div class="stat-label">No Data</div></div>';
+                return;
+            }
+            
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${stats.totalTrades}</div>
+                    <div class="stat-label">Total Trades</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stats.winRate}%</div>
+                    <div class="stat-label">Win Rate</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">$${stats.totalPL.toFixed(2)}</div>
+                    <div class="stat-label">Total P&L</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">$${stats.avgPL.toFixed(2)}</div>
+                    <div class="stat-label">Avg P&L</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stats.martingaleTrades}</div>
+                    <div class="stat-label">Martingale Trades</div>
+                </div>
+            `;
+        }
+
+        function populateFilters() {
+            // Populate market filter
+            const markets = [...new Set(tradeHistoryData.map(t => t.market))];
+            const marketFilter = document.getElementById('marketFilter');
+            marketFilter.innerHTML = '<option value="">All Markets</option>';
+            markets.forEach(market => {
+                marketFilter.innerHTML += `<option value="${market}">${market}</option>`;
+            });
+        }
+
+        function filterTable() {
+            const resultFilter = document.getElementById('resultFilter').value;
+            const marketFilter = document.getElementById('marketFilter').value;
+            const modeFilter = document.getElementById('modeFilter').value;
+            const martingaleFilter = document.getElementById('martingaleFilter').checked;
+            
+            filteredData = tradeHistoryData.filter(trade => {
+                if (resultFilter && trade.result !== resultFilter) return false;
+                if (marketFilter && trade.market !== marketFilter) return false;
+                if (modeFilter && trade.tradingMode !== modeFilter) return false;
+                if (martingaleFilter && !trade.martingaleActive) return false;
+                return true;
+            });
+            
+            populateTable();
+        }
+
+        function populateTable() {
+            const tbody = document.getElementById('historyTableBody');
+            
+            if (filteredData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="14" class="no-data">No data matches the current filters.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = filteredData.map(trade => {
+                const resultClass = trade.result.toLowerCase();
+                const martingaleClass = trade.martingaleActive ? 'martingale' : '';
+                
+                return `
+                    <tr class="${resultClass}">
+                        <td>${new Date(trade.timestamp).toLocaleString()}</td>
+                        <td>${trade.cycleId}</td>
+                        <td>${trade.market}</td>
+                        <td>${trade.tradingMode}</td>
+                        <td>$${trade.stakePerTrade.toFixed(2)}</td>
+                        <td>$${trade.totalStake.toFixed(2)}</td>
+                        <td>$${trade.underProfit.toFixed(2)}</td>
+                        <td>$${trade.overProfit.toFixed(2)}</td>
+                        <td class="${martingaleClass}">$${trade.netProfitLoss.toFixed(2)}</td>
+                        <td>${trade.result}</td>
+                        <td>$${trade.balanceAfter.toFixed(2)}</td>
+                        <td>${trade.martingaleActive ? '🔥' : ''}</td>
+                        <td>${trade.consecutiveLosses}</td>
+                        <td>$${trade.totalAccumulatedLoss.toFixed(2)}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function downloadCSV() {
+            const csvData = localStorage.getItem('tradeHistoryCSV');
+            if (!csvData) {
+                alert('No CSV data available. Start trading to generate data.');
+                return;
+            }
+            
+            const blob = new Blob([csvData], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `trade_history_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        function clearHistory() {
+            if (confirm('Are you sure you want to clear all trade history? This cannot be undone.')) {
+                localStorage.removeItem('tradeHistory');
+                localStorage.removeItem('tradeHistoryCSV');
+                loadTradeHistory();
+                alert('Trade history cleared successfully.');
+            }
+        }
+
+        function analyzeMartingale() {
+            const martingaleTrades = tradeHistoryData.filter(t => t.martingaleActive);
+            
+            if (martingaleTrades.length === 0) {
+                alert('No Martingale trades found in history');
+                return;
+            }
+            
+            const wins = martingaleTrades.filter(t => t.result === 'WIN').length;
+            const winRate = ((wins / martingaleTrades.length) * 100).toFixed(2);
+            const avgStake = martingaleTrades.reduce((sum, t) => sum + t.stakePerTrade, 0) / martingaleTrades.length;
+            const totalPL = martingaleTrades.reduce((sum, t) => sum + t.netProfitLoss, 0);
+            
+            alert(`🔥 Martingale Analysis:\n\nTotal Martingale trades: ${martingaleTrades.length}\nWins: ${wins}\nWin Rate: ${winRate}%\nAverage Stake: $${avgStake.toFixed(2)}\nTotal P&L: $${totalPL.toFixed(2)}`);
+        }
+
+        function analyzeMarkets() {
+            const marketStats = {};
+            
+            tradeHistoryData.forEach(trade => {
+                if (!marketStats[trade.market]) {
+                    marketStats[trade.market] = { total: 0, wins: 0, totalPL: 0 };
+                }
+                marketStats[trade.market].total++;
+                if (trade.result === 'WIN') marketStats[trade.market].wins++;
+                marketStats[trade.market].totalPL += trade.netProfitLoss;
+            });
+            
+            let report = '📈 Market Performance:\n\n';
+            Object.entries(marketStats).forEach(([market, stats]) => {
+                const winRate = ((stats.wins / stats.total) * 100).toFixed(2);
+                report += `${market}: ${stats.total} trades, ${winRate}% win rate, $${stats.totalPL.toFixed(2)} P&L\n`;
+            });
+            
+            alert(report);
+        }
+
+        // Load data on page load
+        window.onload = function() {
+            loadTradeHistory();
+        };
+    </script>
+</body>
+</html>
