@@ -996,7 +996,7 @@ function handleTradeOutcome(contractResult) {
         // Calculate dual trade pair results correctly for dual trading strategy
         const underProfit = currentDualTradePair.underTrade.profit;
         const overProfit = currentDualTradePair.overTrade.profit;
-        const totalStake = Number(nextTradeStake) * 2; // Two trades stake
+        const totalStake = currentDualTradePair.actualTotalStake || (Number(nextTradeStake) * 2); // Two trades stake
         
         // In dual trading: we stake on both trades, but only one can win
         // The "profit" from API is already net (payout - individual stake)
@@ -1010,7 +1010,7 @@ function handleTradeOutcome(contractResult) {
         // Since API profit = payout - stake, then payout = profit + stake
         let balanceChange;
         if (winningTradeProfit > 0) {
-            const winningPayout = winningTradeProfit + Number(nextTradeStake); // Recover the payout
+            const winningPayout = winningTradeProfit + currentDualTradePair.actualStakePerTrade; // Recover the payout
             balanceChange = winningPayout - totalStake; // Total payout minus total stake
         } else {
             // Both trades lost (very rare but possible)
@@ -1395,8 +1395,9 @@ function updateTradeResult(contractId, profit, finalPrice, contractType) {
     const borderColor = isWin ? '#28a745' : '#dc3545'; // Green border for win, red border for loss
     const textColor = isWin ? '#155724' : '#721c24'; // Dark green text for win, dark red text for loss
     
-    const finalPayout = isWin ? profit + Number(nextTradeStake) : 0;
+    const finalPayout = isWin ? profit + currentDualTradePair.actualStakePerTrade : 0;
     const lastDigit = Number(String(finalPrice).slice(-1));
+    const actualStakeUsedForThisTrade = currentDualTradePair.actualStakePerTrade || Number(nextTradeStake);
     
     // Update the HTML with inline styles to ensure they're applied
     tradeElement.innerHTML = `
@@ -1415,7 +1416,7 @@ function updateTradeResult(contractId, profit, finalPrice, contractType) {
         </div>
         <div style="margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.1); border-radius: 3px;">
             <div><strong>Final Price:</strong> ${finalPrice} (Last Digit: ${lastDigit})</div>
-            <div><strong>Stake:</strong> $${nextTradeStake} | <strong>Payout:</strong> $${finalPayout.toFixed(2)}</div>
+            <div><strong>Stake:</strong> $${actualStakeUsedForThisTrade.toFixed(2)} | <strong>Payout:</strong> $${finalPayout.toFixed(2)}</div>
             <div><strong>Market:</strong> ${market} | <strong>Duration:</strong> ${tickDuration} ticks</div>
         </div>
     `;
