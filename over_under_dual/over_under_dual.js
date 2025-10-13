@@ -17,7 +17,7 @@ let userTokenByUrl = null,
     marketHistoryData = {},
     analysisProgress = 0,
     totalMarketsToAnalyze = 0,
-    martingaleMultiplyr = 6, // Balanced multiplier for loss recovery with good profit margin
+    martingaleMultiplyr = 4, // Balanced multiplier for loss recovery with good profit margin
     tradingMode = "analyzing", // "analyzing" or "expansion"
     originalTradingMode = "analyzing", // Store original mode before auto-switch
     // Dual Trading System Variables
@@ -1079,6 +1079,11 @@ function handleTradeOutcome(contractResult) {
             // Both trades lost - calculate stake to recover all accumulated losses
             consecutiveLosses++;
             
+            // Save the current stake value to localStorage for next reload
+            const actualStakeUsed = currentDualTradePair.actualStakePerTrade || Number(nextTradeStake);
+            localStorage.setItem('lastStakeValue', actualStakeUsed.toString());
+            console.log(`💾 Saved last stake value to localStorage: $${actualStakeUsed.toFixed(2)}`);
+            
             // Add current loss to total accumulated loss
             const currentDualTradeLoss = Math.abs(balanceChange); // This is already positive
             totalAccumulatedLoss += currentDualTradeLoss;
@@ -1181,6 +1186,10 @@ function handleTradeOutcome(contractResult) {
                 currentStakeAmount = baseStakeAmount;
                 martingaleActive = false;
                 
+                // Clear lastStakeValue from localStorage since we won
+                localStorage.removeItem('lastStakeValue');
+                console.log(`🗑️ Cleared lastStakeValue from localStorage after winning trade`);
+                
                 // Restore original trading mode if it was auto-switched
                 if (tradingMode === "analyzing" && originalTradingMode !== "analyzing") {
                     console.log(`🔄 RESTORING ORIGINAL TRADING MODE: ${originalTradingMode}`);
@@ -1207,6 +1216,10 @@ function handleTradeOutcome(contractResult) {
                 consecutiveLosses = 0;
                 currentStakeAmount = baseStakeAmount;
                 martingaleActive = false;
+                
+                // Clear lastStakeValue from localStorage since we won
+                localStorage.removeItem('lastStakeValue');
+                console.log(`🗑️ Cleared lastStakeValue from localStorage after normal win`);
             }
         }
         
@@ -1613,6 +1626,22 @@ function setAccData(accData) {
     consecutiveLosses = 0;
     totalAccumulatedLoss = 0; // Reset accumulated losses
     peakBalanceBeforeLosses = accountBalance; // Initialize peak balance to starting balance
+    
+    // Check for lastStakeValue from previous session (after loss)
+    const lastStakeValue = localStorage.getItem('lastStakeValue');
+    if (lastStakeValue && Number(lastStakeValue) > 0) {
+        const previousStake = Number(lastStakeValue);
+        const newStake = (previousStake * martingaleMultiplyr) + baseStakeAmount;
+        
+        console.log(`🔄 Found previous stake value: $${previousStake.toFixed(2)}`);
+        console.log(`📊 Calculating new stake: ($${previousStake.toFixed(2)} × ${martingaleMultiplyr}) + $${baseStakeAmount.toFixed(2)} = $${newStake.toFixed(2)}`);
+        
+        currentStakeAmount = newStake;
+        martingaleActive = true;
+        consecutiveLosses = 1; // Set to 1 to indicate we're in recovery mode
+        
+        console.log(`✅ Applied new stake from previous session: $${currentStakeAmount.toFixed(2)}`);
+    }
     martingaleActive = false;
     maxStakeLimit = (initialAccountBalance * (10 / 100)); // 10% of initial balance max
 

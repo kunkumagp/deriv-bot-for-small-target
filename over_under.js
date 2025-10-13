@@ -342,9 +342,9 @@ function startWebSocket(){
                                         setFlashNotification("Too many losses in a row. Stopping bot.", 1);
                                         // timeInterval = (getRandomNumber(90, 600) * 1000 );
                                     } else if(lostCountInRow >= 4){
-                                        webSocketConnectionStop();
-                                        setFlashNotification("Too many losses in a row. Stopping bot.", 1);
-                                        // timeInterval = (getRandomNumber(90, 600) * 1000 );
+                                        // webSocketConnectionStop();
+                                        // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
+                                        timeInterval = (getRandomNumber(60, 120) * 1000 );
                                         // reload();
                                     } else if(lostCountInRow >= 3){
                                         // webSocketConnectionStop();
