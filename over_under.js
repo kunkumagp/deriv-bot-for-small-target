@@ -7,9 +7,9 @@ const params = new URLSearchParams(window.location.search);
 
 const marketArray2 = [
     { value: "R_10", name: "Volatility 10 Index", interval: 2000 },
-    { value: "R_25", name: "Volatility 25 Index", interval: 2000 },
-    { value: "R_50", name: "Volatility 50 Index", interval: 2000 },
-    { value: "R_75", name: "Volatility 75 Index", interval: 2000 },
+    // { value: "R_25", name: "Volatility 25 Index", interval: 2000 },
+    // { value: "R_50", name: "Volatility 50 Index", interval: 2000 },
+    // { value: "R_75", name: "Volatility 75 Index", interval: 2000 },
     { value: "R_100", name: "Volatility 100 Index", interval: 2000 },
 ];
 
@@ -18,8 +18,8 @@ let ws, apiToken, intervalId;
 let isRunning = false;
 
 let targetProfitPercentagePerSession = 0.01,
-// amountPercentagePerTrade = 0.35,
-amountPercentagePerTrade = 0.1,
+amountPercentagePerTrade = 0.35,
+// amountPercentagePerTrade = 0.1,
 initialAmountPerTrade,
 nextTradeStake,
 userTokenByUrl=null,
@@ -31,7 +31,7 @@ let selectedOverUnderDigit;
 let isMartingaleApplied = true;
 
     
-dayTargetPercentage = 100;
+dayTargetPercentage = 25/100;
 
 
 
@@ -68,7 +68,7 @@ if(params.get("spare")){
 if(userTokenByUrl != null){
     accountSelectElement.value = userTokenByUrl;
 } else{
-    accountSelectElement.value = "YbaIy3dD51g2eoO";
+    accountSelectElement.value = "lkUxtOopvUhCpIX";
 }
 apiToken = accountSelectElement.value;
 
@@ -236,16 +236,27 @@ function startWebSocket(){
                                 // count how many times 0, 1, or 2 appear in lastDigits
                                 const count = lastDigits.filter(d => criticalDigits.includes(d)).length;
 
-                                if (count > 1) {
+                                if((lostCountInRow == 1 && count > 0) || (lostCountInRow > 1 && count > 1)){
                                     console.log("Changed market due to consecutive losses and unfavorable last digits:", market);
                                     placeOUTrade(market, selectedOverUnderDigit, initialAccountBalance, tickDuration);
-                                } else {
+                                }  else {
                                     console.log("Waiting....");
                                     setFlashNotification("Waiting for trade", 0);
                                     setTimeout(() => {
                                         runScriptForTrade(); // retry after short delay
                                     }, marketInterval);
                                 }
+
+                                // if (count > 1) {
+                                //     console.log("Changed market due to consecutive losses and unfavorable last digits:", market);
+                                //     placeOUTrade(market, selectedOverUnderDigit, initialAccountBalance, tickDuration);
+                                // } else {
+                                //     console.log("Waiting....");
+                                //     setFlashNotification("Waiting for trade", 0);
+                                //     setTimeout(() => {
+                                //         runScriptForTrade(); // retry after short delay
+                                //     }, marketInterval);
+                                // }
 
                             } else {
                                 placeOUTrade(market, selectedOverUnderDigit, initialAccountBalance, tickDuration);
@@ -350,11 +361,15 @@ function startWebSocket(){
                                         // webSocketConnectionStop();
                                         // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
                                         // timeInterval = (getRandomNumber(300, 600) * 1000 );
+                                    } else if(lostCountInRow > 2){
+                                        webSocketConnectionStop();
+                                        setFlashNotification("Too many losses in a row. Stopping bot.", 1);
+                                        // timeInterval = (getRandomNumber(300, 600) * 1000 );
                                     } else if(lostCountInRow >= 2){
                                         // webSocketConnectionStop();
                                         // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
                                         // timeInterval = (getRandomNumber(1, 20) * 1000 );
-                                        // timeInterval = (getRandomNumber(20, 60) * 1000 );
+                                        timeInterval = (getRandomNumber(60, 120) * 1000 );
                                     } else if(lostCountInRow >= 1){
                                         // market = getRandomMarket(marketArray2, market);
                                         // timeInterval = (getRandomNumber(1, 20) * 1000 );
@@ -380,24 +395,26 @@ function startWebSocket(){
 
                                     if(currentProfitAmount >= targetProfitPerSession){
 
-                                        // if(initialAccountBalance >= Number(localStorage.getItem('targetAccountBalancePerToday'))){
-                                        //     let message = "Day target has been achieved. Rest for the day.";
-                                        //     setFlashNotification(message, 0);
-                                        //     console.log(message);
-                                        // } else {
-                                        //     // timeInterval = (getRandomNumber(120, 180) * 1000 );
-                                        //     // timeInterval = (getRandomNumber(1, 10) * 1000 );
-                                        //     timeInterval = (getRandomNumber(1, 5) * 1000 );
-                                        //     setTimer(timeInterval);
-                                        //     setTimeout(() => {
-                                        //         reload();
-                                        //     }, timeInterval);
-                                        // }
-                                        timeInterval = (getRandomNumber(1, 5) * 1000 );
-                                        setTimer(timeInterval);
-                                        setTimeout(() => {
-                                            reload();
-                                        }, timeInterval);
+                                        if(initialAccountBalance >= Number(localStorage.getItem('targetAccountBalancePerToday'))){
+                                            let message = "Day target has been achieved. Rest for the day.";
+                                            setFlashNotification(message, 0);
+                                            console.log(message);
+                                        } else {
+                                            // timeInterval = (getRandomNumber(120, 180) * 1000 );
+                                            // timeInterval = (getRandomNumber(1, 10) * 1000 );
+                                            timeInterval = (getRandomNumber(1, 5) * 1000 );
+                                            setTimer(timeInterval);
+                                            setTimeout(() => {
+                                                reload();
+                                            }, timeInterval);
+                                        }
+
+
+                                        // timeInterval = (getRandomNumber(1, 5) * 1000 );
+                                        // setTimer(timeInterval);
+                                        // setTimeout(() => {
+                                        //     reload();
+                                        // }, timeInterval);
                                         
                                     } else {
                                         timeInterval = 0;
@@ -575,11 +592,11 @@ function setDayTarget() {
     const formatted = today.toISOString().split("T")[0];
 
     if(formatted !== date){
-        localStorage.setItem('targetAccountBalancePerToday', (initialAccountBalance * 2));
+        localStorage.setItem('targetAccountBalancePerToday', ((initialAccountBalance * dayTargetPercentage) + initialAccountBalance));
         localStorage.setItem('date', formatted);
     } else {
         if(!targetAccountBalancePerToday){
-            localStorage.setItem('targetAccountBalancePerToday', (initialAccountBalance * 2));
+            localStorage.setItem('targetAccountBalancePerToday', ((initialAccountBalance * dayTargetPercentage) + initialAccountBalance));
         }
     }
 }
