@@ -3,13 +3,15 @@ let pingIntervalId;
 const marketSelectElement = document.getElementById("market");
 const resetBotButton = document.getElementById("resetBot");
 const reStartBotButton = document.getElementById("reStartBot");
+const initCapitalInput = document.getElementById("init_capital");
+const devidedValue = document.getElementById("devided_value");
 const params = new URLSearchParams(window.location.search);
 
 const marketArray2 = [
     { value: "R_10", name: "Volatility 10 Index", interval: 2000 },
-    // { value: "R_25", name: "Volatility 25 Index", interval: 2000 },
-    // { value: "R_50", name: "Volatility 50 Index", interval: 2000 },
-    // { value: "R_75", name: "Volatility 75 Index", interval: 2000 },
+    { value: "R_25", name: "Volatility 25 Index", interval: 2000 },
+    { value: "R_50", name: "Volatility 50 Index", interval: 2000 },
+    { value: "R_75", name: "Volatility 75 Index", interval: 2000 },
     { value: "R_100", name: "Volatility 100 Index", interval: 2000 },
 ];
 
@@ -18,8 +20,7 @@ let ws, apiToken, intervalId;
 let isRunning = false;
 
 let targetProfitPercentagePerSession = 0.01,
-amountPercentagePerTrade = 0.35,
-// amountPercentagePerTrade = 0.1,
+amountPercentagePerTrade = 0.35, // Default value, will be updated based on input values
 initialAmountPerTrade,
 nextTradeStake,
 userTokenByUrl=null,
@@ -83,13 +84,78 @@ resetBotButton.addEventListener('click', resetBot);
 
 reStartBotButton.addEventListener('click', reStartBot);
 
+// Load saved values from localStorage on page load
+loadSavedValues();
+
+// Calculate amount percentage after loading values
+updateAmountPercentage();
+
+// Add event listeners to save values to localStorage when they change
+initCapitalInput.addEventListener('input', function() {
+    localStorage.setItem('init_capital', this.value);
+    updateAmountPercentage(); // Recalculate when value changes
+});
+
+devidedValue.addEventListener('input', function() {
+    localStorage.setItem('devided_value', this.value);
+    updateAmountPercentage(); // Recalculate when value changes
+});
 
 // ---------------------------------------------------------------------
 
+function loadSavedValues() {
+    // Load saved init_capital value
+    const savedInitCapital = localStorage.getItem('init_capital');
+    if (savedInitCapital !== null && savedInitCapital !== '') {
+        initCapitalInput.value = savedInitCapital;
+    }
+    
+    // Load saved devided_value
+    const savedDevidedValue = localStorage.getItem('devided_value');
+    if (savedDevidedValue !== null && savedDevidedValue !== '') {
+        devidedValue.value = savedDevidedValue;
+    }
+}
+
+function updateAmountPercentage() {
+    const initCapital = parseFloat(initCapitalInput.value);
+    const divided = parseFloat(devidedValue.value);
+    
+    if (!isNaN(initCapital) && !isNaN(divided) && divided !== 0) {
+        // Calculate: (Initial Capital / Divided Value) * 0.35%
+        amountPercentagePerTrade = (initCapital / divided) * (0.35 / 100);
+        console.log(`Calculated amount per trade: (${initCapital} / ${divided}) * 0.35% = ${amountPercentagePerTrade}`);
+    } else {
+        amountPercentagePerTrade = 0.35; // Default value
+        console.log('Using default amount per trade: 0.35');
+    }
+    
+    console.log('Updated amountPercentagePerTrade:', amountPercentagePerTrade);
+}
+
+function resetBot() {
+    // Clear localStorage values
+    localStorage.removeItem('init_capital');
+    localStorage.removeItem('devided_value');
+    
+    // Reset input fields
+    initCapitalInput.value = '';
+    devidedValue.value = '';
+    
+    // Reset amount percentage to default
+    amountPercentagePerTrade = 0.35;
+    
+    // Stop any running processes
+    webSocketConnectionStop();
+    
+    console.log('Bot reset - all values cleared');
+}
 
 // webSocketConnectionStart();
-startWebSocket();
 
+if(initCapitalInput.value !== '' && devidedValue.value !== '' && !isNaN(parseFloat(initCapitalInput.value)) && !isNaN(parseFloat(devidedValue.value))){
+    startWebSocket();
+}
 
 
 function reStartBot() {
@@ -353,22 +419,27 @@ function startWebSocket(){
                                         setFlashNotification("Too many losses in a row. Stopping bot.", 1);
                                         // timeInterval = (getRandomNumber(90, 600) * 1000 );
                                     } else if(lostCountInRow >= 4){
-                                        // webSocketConnectionStop();
-                                        // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
+                                        webSocketConnectionStop();
+                                        setFlashNotification("Too many losses in a row. Stopping bot.", 1);
                                         timeInterval = (getRandomNumber(60, 120) * 1000 );
                                         // reload();
                                     } else if(lostCountInRow >= 3){
-                                        webSocketConnectionStop();
-                                        setFlashNotification("Too many losses in a row. Stopping bot.", 1);
+                                        // webSocketConnectionStop();
+                                        // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
                                         // timeInterval = (getRandomNumber(300, 600) * 1000 );
-                                    } else if(lostCountInRow == 2){
-                                        webSocketConnectionStop();
-                                        setFlashNotification("Too many losses in a row. Stopping bot.", 1);
+                                        timeInterval = (getRandomNumber(120, 180) * 1000 );
+
+                                    } else if(lostCountInRow >= 2){
+                                        // webSocketConnectionStop();
+                                        // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
                                         // timeInterval = (getRandomNumber(1, 20) * 1000 );
+                                        // timeInterval = (getRandomNumber(120, 180) * 1000 );
+                                        timeInterval = (getRandomNumber(60, 120) * 1000 );
+
                                     } else if(lostCountInRow >= 1){
                                         // market = getRandomMarket(marketArray2, market);
                                         // timeInterval = (getRandomNumber(1, 20) * 1000 );
-                                        timeInterval = (getRandomNumber(60, 120) * 1000 );
+                                        // timeInterval = (getRandomNumber(60, 120) * 1000 );
 
                                     }
                                     // market = getRandomMarket(marketArray2, market);
@@ -529,9 +600,8 @@ function setAccData(accData) {
     localStorage.setItem('targetProfitPerSession', targetProfitPerSession);
 
 
-    // Set Target Profit Amount Per Trade
-    initialAmountPerTrade = (initialAccountBalance * (amountPercentagePerTrade / 100)).toFixed(2);
-    // initialAmountPerTrade = amountPercentagePerTrade;
+    // Set Initial Amount Per Trade (amountPercentagePerTrade is already the actual amount, not percentage)
+    initialAmountPerTrade = Number(amountPercentagePerTrade).toFixed(2);
     setAccountInfo("initialAmountPerTrade", `$ ${Number(initialAmountPerTrade).toFixed(2)}`);
     localStorage.setItem('initialAmountPerTrade', initialAmountPerTrade);
 
