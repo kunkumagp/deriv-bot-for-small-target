@@ -17,7 +17,7 @@ marketArray.forEach((item) => {
     marketSelectElement.appendChild(option);
 });
 
-accountSelectElement.value = "YbaIy3dD51g2eoO";
+accountSelectElement.value = "lkUxtOopvUhCpIX";
 marketSelectElement.value = "R_100";
 apiToken = accountSelectElement.value;
 
