@@ -20,7 +20,8 @@ let ws, apiToken, intervalId;
 let isRunning = false;
 
 let targetProfitPercentagePerSession = 0.01,
-amountPercentagePerTrade = 0.35, // Default value, will be updated based on input values
+// amountPercentagePerTrade = 0.35, // Default value, will be updated based on input values
+amountPercentagePerTrade = (initCapitalInput.value / devidedValue.value) * (0.35/100), // Default value, will be updated based on input values
 initialAmountPerTrade,
 nextTradeStake,
 userTokenByUrl=null,
@@ -120,20 +121,23 @@ function loadSavedValues() {
 function updateAmountPercentage() {
     const initCapital = parseFloat(initCapitalInput.value);
     const divided = parseFloat(devidedValue.value);
+    amountPercentagePerTrade = (initCapital / divided) * (0.35 / 100);
     
-    if (!isNaN(initCapital) && !isNaN(divided) && divided !== 0) {
-        // Calculate: (Initial Capital / Divided Value) * 0.35%
-        amountPercentagePerTrade = (initCapital / divided) * (0.35 / 100);
-        console.log(`Calculated amount per trade: (${initCapital} / ${divided}) * 0.35% = ${amountPercentagePerTrade}`);
-    } else {
-        amountPercentagePerTrade = 0.35; // Default value
-        console.log('Using default amount per trade: 0.35');
-    }
+    // if (!isNaN(initCapital) && !isNaN(divided) && divided !== 0) {
+    //     // Calculate: (Initial Capital / Divided Value) * 0.35%
+    //     amountPercentagePerTrade = (initCapital / divided) * (0.35 / 100);
+    //     console.log(`Calculated amount per trade: (${initCapital} / ${divided}) * 0.35% = ${amountPercentagePerTrade}`);
+    // } else {
+    //     amountPercentagePerTrade = 0.35; // Default value
+    //     console.log('Using default amount per trade: 0.35');
+    // }
     
-    console.log('Updated amountPercentagePerTrade:', amountPercentagePerTrade);
+    // console.log('Updated amountPercentagePerTrade:', amountPercentagePerTrade);
 }
 
 function resetBot() {
+    const initCapital = parseFloat(initCapitalInput.value);
+    const divided = parseFloat(devidedValue.value);
     // Clear localStorage values
     localStorage.removeItem('init_capital');
     localStorage.removeItem('devided_value');
@@ -143,7 +147,9 @@ function resetBot() {
     devidedValue.value = '';
     
     // Reset amount percentage to default
-    amountPercentagePerTrade = 0.35;
+    // amountPercentagePerTrade = 0.35;
+    amountPercentagePerTrade = (initCapital / divided) * (0.35 / 100);
+
     
     // Stop any running processes
     webSocketConnectionStop();
@@ -250,6 +256,9 @@ function startWebSocket(){
                         // Set Account Details and trading Data
                         setAccData(wsResponse.authorize);
 
+                        console.log("Initial amount per trade:", initialAmountPerTrade);
+                        
+
                         runScriptForTrade();
                     } else if (wsResponse?.error?.code !== undefined && wsResponse.error.code === "WrongResponse") {
                         reload();
@@ -272,62 +281,65 @@ function startWebSocket(){
                         if (probability >= 70) {
                             console.log("Condition met. Placing Over 2 trade...");
 
-                            if(lostCountInRow >= 1){
-                                // tickDuration = getRandomNumber(1, 10);
-                                // if (isReadyForDigitOver2(lastDigits)) {
-                                //     console.log("✅ Ready to trade Digit Over 2");
-                                //     console.log("Changed market due to consecutive losses and unfavorable last digits:", market);
-                                //     placeOUTrade(market);
-                                // } else {
-                                //     console.log("❌ Not ready yet");
-                                //     console.log("Skipped trade. Probability too low:", probability.toFixed(2), "%");
-                                //     setTimeout(() => {
-                                //         runScriptForTrade(); // retry after short delay
-                                //     }, 1000);
-                                // }
+                            // if(lostCountInRow >= 1){
+                            //     // tickDuration = getRandomNumber(1, 10);
+                            //     // if (isReadyForDigitOver2(lastDigits)) {
+                            //     //     console.log("✅ Ready to trade Digit Over 2");
+                            //     //     console.log("Changed market due to consecutive losses and unfavorable last digits:", market);
+                            //     //     placeOUTrade(market);
+                            //     // } else {
+                            //     //     console.log("❌ Not ready yet");
+                            //     //     console.log("Skipped trade. Probability too low:", probability.toFixed(2), "%");
+                            //     //     setTimeout(() => {
+                            //     //         runScriptForTrade(); // retry after short delay
+                            //     //     }, 1000);
+                            //     // }
                                 
                                 
-                                // if(lastDigits.includes(0) || lastDigits.includes(1) || lastDigits.includes(2)){
-                                //     console.log("Changed market due to consecutive losses and unfavorable last digits:", market);
-                                //     placeOUTrade(market);
-                                // } else {
-                                //     setTimeout(() => {
-                                //         runScriptForTrade(); // retry after short delay
-                                //     }, 1000);
-                                // }
+                            //     // if(lastDigits.includes(0) || lastDigits.includes(1) || lastDigits.includes(2)){
+                            //     //     console.log("Changed market due to consecutive losses and unfavorable last digits:", market);
+                            //     //     placeOUTrade(market);
+                            //     // } else {
+                            //     //     setTimeout(() => {
+                            //     //         runScriptForTrade(); // retry after short delay
+                            //     //     }, 1000);
+                            //     // }
 
 
 
-                                const criticalDigits = [0, 1, 2];
-                                // count how many times 0, 1, or 2 appear in lastDigits
-                                const count = lastDigits.filter(d => criticalDigits.includes(d)).length;
+                            //     const criticalDigits = [0, 1, 2];
+                            //     // count how many times 0, 1, or 2 appear in lastDigits
+                            //     const count = lastDigits.filter(d => criticalDigits.includes(d)).length;
 
-                                if((lostCountInRow == 1 && count > 0) || (lostCountInRow > 1 && count > 1)){
-                                    console.log("Changed market due to consecutive losses and unfavorable last digits:", market);
-                                    placeOUTrade(market, selectedOverUnderDigit, initialAccountBalance, tickDuration);
-                                }  else {
-                                    console.log("Waiting....");
-                                    setFlashNotification("Waiting for trade", 0);
-                                    setTimeout(() => {
-                                        runScriptForTrade(); // retry after short delay
-                                    }, marketInterval);
-                                }
+                            //     if((lostCountInRow == 1 && count > 0) || (lostCountInRow > 1 && count > 1)){
+                            //         console.log("Changed market due to consecutive losses and unfavorable last digits:", market);
+                            //         placeOUTrade(market, selectedOverUnderDigit, initialAccountBalance, tickDuration);
+                            //     }  else {
+                            //         console.log("Waiting....");
+                            //         setFlashNotification("Waiting for trade", 0);
+                            //         setTimeout(() => {
+                            //             runScriptForTrade(); // retry after short delay
+                            //         }, marketInterval);
+                            //     }
 
-                                // if (count > 1) {
-                                //     console.log("Changed market due to consecutive losses and unfavorable last digits:", market);
-                                //     placeOUTrade(market, selectedOverUnderDigit, initialAccountBalance, tickDuration);
-                                // } else {
-                                //     console.log("Waiting....");
-                                //     setFlashNotification("Waiting for trade", 0);
-                                //     setTimeout(() => {
-                                //         runScriptForTrade(); // retry after short delay
-                                //     }, marketInterval);
-                                // }
+                            //     // if (count > 1) {
+                            //     //     console.log("Changed market due to consecutive losses and unfavorable last digits:", market);
+                            //     //     placeOUTrade(market, selectedOverUnderDigit, initialAccountBalance, tickDuration);
+                            //     // } else {
+                            //     //     console.log("Waiting....");
+                            //     //     setFlashNotification("Waiting for trade", 0);
+                            //     //     setTimeout(() => {
+                            //     //         runScriptForTrade(); // retry after short delay
+                            //     //     }, marketInterval);
+                            //     // }
 
-                            } else {
+                            // } else {
+                            //     placeOUTrade(market, selectedOverUnderDigit, initialAccountBalance, tickDuration);
+
+                            // }
+
                                 placeOUTrade(market, selectedOverUnderDigit, initialAccountBalance, tickDuration);
 
-                            }
                             
                         } else {
                             console.log("Skipped trade. Probability too low:", probability.toFixed(2), "%");
@@ -406,6 +418,7 @@ function startWebSocket(){
 
                                 if (currentLossAmount < 0) {
                                     localStorage.setItem("totalLostAmount",currentLossAmount );
+                                    market = getRandomMarket(marketArray2, market);
 
 
                                     // When Trade Loss
@@ -419,30 +432,35 @@ function startWebSocket(){
                                         setFlashNotification("Too many losses in a row. Stopping bot.", 1);
                                         // timeInterval = (getRandomNumber(90, 600) * 1000 );
                                     } else if(lostCountInRow >= 4){
-                                        webSocketConnectionStop();
-                                        setFlashNotification("Too many losses in a row. Stopping bot.", 1);
-                                        timeInterval = (getRandomNumber(60, 120) * 1000 );
+                                        // webSocketConnectionStop();
+                                        // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
+                                        // timeInterval = (getRandomNumber(60, 120) * 1000 );
                                         // reload();
+                                        // timeInterval = (getRandomNumber(getRandomNumber(120, 180), getRandomNumber(180, 300)) * 1000 );
+
                                     } else if(lostCountInRow >= 3){
                                         // webSocketConnectionStop();
                                         // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
                                         // timeInterval = (getRandomNumber(300, 600) * 1000 );
-                                        timeInterval = (getRandomNumber(120, 180) * 1000 );
+                                        // timeInterval = (getRandomNumber(120, 180) * 1000 );
+                                        // timeInterval = (getRandomNumber(getRandomNumber(120, 180), getRandomNumber(180, 300)) * 1000 );
 
                                     } else if(lostCountInRow >= 2){
                                         // webSocketConnectionStop();
                                         // setFlashNotification("Too many losses in a row. Stopping bot.", 1);
                                         // timeInterval = (getRandomNumber(1, 20) * 1000 );
                                         // timeInterval = (getRandomNumber(120, 180) * 1000 );
-                                        timeInterval = (getRandomNumber(60, 120) * 1000 );
+                                        // timeInterval = (getRandomNumber(120, 180) * 1000 );
+                                        // timeInterval = (getRandomNumber(getRandomNumber(35, 60), getRandomNumber(75, 120)) * 1000 );
 
                                     } else if(lostCountInRow >= 1){
                                         // market = getRandomMarket(marketArray2, market);
                                         // timeInterval = (getRandomNumber(1, 20) * 1000 );
                                         // timeInterval = (getRandomNumber(60, 120) * 1000 );
+                                        // timeInterval = (getRandomNumber(getRandomNumber(15, 25), getRandomNumber(25, 35)) * 1000 );
 
                                     }
-                                    // market = getRandomMarket(marketArray2, market);
+                                        timeInterval = (getRandomNumber(getRandomNumber(120, 180), getRandomNumber(180, 300)) * 1000 );
 
                                 
                                     setTimer(timeInterval);
@@ -547,6 +565,12 @@ function startWebSocket(){
 // ---------------------------------------------------------------------
 
 const stakeChangeForOU = (status) => {
+     const initCapital = parseFloat(initCapitalInput.value);
+    const divided = parseFloat(devidedValue.value);
+
+    initialAmountPerTrade = (initCapital / divided) * (0.35 / 100);
+
+
     if(isMartingaleApplied){
         if (status == "Loss") {
             stake = stake * martingaleMultiplier3;
@@ -574,7 +598,6 @@ function setAccData(accData) {
     }
 
     console.log('isMartingaleApplied:', isMartingaleApplied);
-    console.log('amountPercentagePerTrade:', amountPercentagePerTrade);
 
     // Set Initial Account Balance
     let accountBalance = (Number(accData.balance)-spareAmount);
@@ -599,9 +622,13 @@ function setAccData(accData) {
     setAccountInfo("targetProfitPerSession", `$ ${Number(targetProfitPerSession).toFixed(2)}`);
     localStorage.setItem('targetProfitPerSession', targetProfitPerSession);
 
+    console.log('initialAccountBalance:', initialAccountBalance);
+    console.log('amountPercentagePerTrade:', amountPercentagePerTrade);
+
+
 
     // Set Initial Amount Per Trade (amountPercentagePerTrade is already the actual amount, not percentage)
-    initialAmountPerTrade = Number(amountPercentagePerTrade).toFixed(2);
+    initialAmountPerTrade = amountPercentagePerTrade / initCapitalInput.value * initialAccountBalance;
     setAccountInfo("initialAmountPerTrade", `$ ${Number(initialAmountPerTrade).toFixed(2)}`);
     localStorage.setItem('initialAmountPerTrade', initialAmountPerTrade);
 
